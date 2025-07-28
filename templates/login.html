@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Login - Burundian Market{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="text-center mb-0">Login to Your Account</h3>
+                    {% if request.args.get('expired') %}
+                        <div class="alert alert-warning text-center py-1 mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Your session has expired. Please login again.
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('login') }}" id="loginForm" novalidate>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+
+                        <!-- Flash messages -->
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                        <i class="fas {% if category == 'success' %}fa-check-circle{% else %}fa-exclamation-circle{% endif %} me-2"></i>
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <div class="mb-4">
+                            <label for="identifier" class="form-label fw-bold">Email or Username</label>
+                            <input type="text" class="form-control py-2" id="identifier" name="identifier" 
+                                   required autofocus value="{{ request.form.identifier if request.form.identifier }}"
+                                   placeholder="Enter your email or username">
+                            <div class="invalid-feedback">
+                                Please enter your registered email or username
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="password" class="form-label fw-bold">Password</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control py-2" id="password" name="password" 
+                                       required placeholder="Enter your password">
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="fas fa-eye-slash"></i>
+                                </button>
+                            </div>
+                            <div class="invalid-feedback">
+                                Please enter your password
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4 d-flex justify-content-between align-items-center">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="remember" name="remember" checked>
+                                <label class="form-check-label" for="remember">Keep me logged in (for 30 days)</label>
+                            </div>
+                            <div>
+                                <a href="{{ url_for('forgot_password') }}" class="text-decoration-none">Forgot password?</a>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                            <span id="loginText">Login</span>
+                            <span id="loginSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        </button>
+                        
+                        <div class="mt-4 text-center">
+                            <p class="mb-2">Don't have an account? <a href="{{ url_for('register') }}" class="text-decoration-none fw-bold">Create one</a></p>
+                            <hr class="my-3">
+                            <p class="small text-muted">By logging in, you agree to our <a href="{{ url_for('terms') }}" class="text-decoration-none">Terms</a> and <a href="{{ url_for('privacy_policy') }}" class="text-decoration-none">Privacy Policy</a></p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Password visibility toggle
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#password');
+    
+    if (togglePassword && password) {
+        togglePassword.addEventListener('click', function() {
+            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+            password.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('fa-eye');
+            this.querySelector('i').classList.toggle('fa-eye-slash');
+        });
+    }
+
+    // Form validation and submission
+    const form = document.getElementById('loginForm');
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            } else {
+                // Show loading state
+                document.getElementById('loginText').classList.add('d-none');
+                document.getElementById('loginSpinner').classList.remove('d-none');
+                document.querySelector('button[type="submit"]').disabled = true;
+                
+                // Store login time in localStorage
+                localStorage.setItem('lastLoginAttempt', new Date().toISOString());
+                
+                // Store remember me preference
+                const rememberMe = document.getElementById('remember').checked;
+                localStorage.setItem('rememberMe', rememberMe);
+            }
+            form.classList.add('was-validated');
+        });
+    }
+
+    // Auto-focus on identifier field
+    const identifierField = document.getElementById('identifier');
+    if (identifierField) {
+        identifierField.focus();
+    }
+
+    // Restore remember me preference
+    const rememberMe = localStorage.getItem('rememberMe');
+    if (rememberMe !== null) {
+        document.getElementById('remember').checked = rememberMe === 'true';
+    }
+
+    // Check for existing session on page load
+    checkExistingSession();
+
+    // Session activity tracking
+    let lastActivity = Date.now();
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    
+    activityEvents.forEach(event => {
+        window.addEventListener(event, () => {
+            lastActivity = Date.now();
+        });
+    });
+
+    // Check session every 5 minutes
+    setInterval(() => {
+        checkSessionStatus();
+    }, 300000);
+
+    // Check for previous failed login attempts
+    const lastAttempt = localStorage.getItem('lastLoginAttempt');
+    if (lastAttempt) {
+        const hoursSinceAttempt = (Date.now() - new Date(lastAttempt)) / (1000 * 60 * 60);
+        if (hoursSinceAttempt > 1) {
+            localStorage.removeItem('lastLoginAttempt');
+        }
+    }
+    
+    // Check for session expiration on page load
+    if (new URLSearchParams(window.location.search).has('expired')) {
+        showSessionExpiredAlert();
+    }
+
+    function checkExistingSession() {
+        fetch('/check-session', {
+            credentials: 'same-origin',
+            method: 'GET'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.authenticated) {
+                // Redirect to appropriate dashboard
+                window.location.href = data.redirect_url || '/dashboard';
+            }
+        })
+        .catch(error => {
+            console.error('Session check error:', error);
+        });
+    }
+
+    function checkSessionStatus() {
+        fetch('/session-check', {
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'expired') {
+                window.location.href = '/login?expired=1';
+            }
+        })
+        .catch(() => {
+            console.log('Session check failed');
+        });
+    }
+
+    function showSessionExpiredAlert() {
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-warning alert-dismissible fade show mb-3';
+        alert.innerHTML = `
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Your session has expired. Please login again.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        document.querySelector('.card-header').appendChild(alert);
+    }
+});
+</script>
+{% endblock %}

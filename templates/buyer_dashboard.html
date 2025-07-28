@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Browse Products{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Browse Products</h2>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <form action="{{ url_for('product_search') }}" method="GET" class="d-flex">
+            <input type="text" name="q" class="form-control me-2" placeholder="Search products..." 
+                   value="{{ request.args.get('q', '') }}">
+            <select name="category" class="form-select me-2">
+                <option value="">All Categories</option>
+                {% for category in categories %}
+                    <option value="{{ category }}" 
+                            {% if request.args.get('category') == category %}selected{% endif %}>
+                        {{ category }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+    </div>
+</div>
+
+{% if products %}
+<div class="row">
+    {% for product in products %}
+    <div class="col-md-3 mb-4">
+        <div class="card h-100">
+            {% if product.image %}
+            <img src="{{ url_for('static', filename=product.image) }}" 
+                 class="card-img-top product-image" 
+                 alt="{{ product.title }}"
+                 style="height: 200px; object-fit: cover;">
+            {% else %}
+            <div class="card-img-top bg-secondary" style="height: 200px;"></div>
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ product.title }}</h5>
+                <p class="card-text text-success fw-bold">{{ product.price }} BIF</p>
+                {% if product.category %}
+                <p class="card-text text-muted">{{ product.category }}</p>
+                {% endif %}
+                <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn btn-primary">View Details</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">No products found matching your search.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Cookie Preferences - Burundian Market{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="h4 mb-0">Cookie Preferences</h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('cookie_preferences') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        
+                        <!-- Rest of your form content remains the same -->
+                        <div class="mb-4">
+                            <h3 class="h5">Essential Cookies</h3>
+                            <p class="small text-muted">
+                                These cookies are necessary for the website to function and cannot be switched off.
+                                They are usually only set in response to actions made by you such as logging in or
+                                filling in forms.
+                            </p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="functional" 
+                                    name="functional" value="on" 
+                                    {% if preferences.functional == 'on' %}checked{% endif %}>
+                                <label class="form-check-label" for="functional">
+                                    <strong>Functional Cookies</strong>
+                                </label>
+                            </div>
+                            <p class="small text-muted ps-4">
+                                These cookies enable enhanced functionality like remembering your preferences.
+                                Disabling these may affect your user experience.
+                            </p>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="analytics" 
+                                    name="analytics" value="on"
+                                    {% if preferences.analytics == 'on' %}checked{% endif %}>
+                                <label class="form-check-label" for="analytics">
+                                    <strong>Analytics Cookies</strong>
+                                </label>
+                            </div>
+                            <p class="small text-muted ps-4">
+                                These cookies help us understand how visitors interact with our website by
+                                collecting and reporting information anonymously.
+                            </p>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('privacy_policy') }}" class="btn btn-outline-secondary">
+                                Privacy Policy
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                Save Preferences
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

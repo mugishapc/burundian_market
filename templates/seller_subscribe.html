@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Seller Subscription{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="text-center">Seller Subscription</h3>
+                </div>
+                <div class="card-body">
+                    {% if user.is_seller_active %}
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading">Your account is active!</h4>
+                        {% if user.subscription_end %}
+                            <p>Your subscription ends on: {{ user.subscription_end.strftime('%Y-%m-%d') }}</p>
+                        {% else %}
+                            <p>You are currently in your 5-day trial period.</p>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading">Your seller account is not active</h4>
+                        <p>To continue publishing products, please choose a subscription plan below.</p>
+                    </div>
+                    
+                    <h4 class="mt-4">Choose Subscription Plan</h4>
+                    <form method="POST" action="{{ url_for('choose_subscription') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="row row-cols-1 row-cols-md-2 g-4 mt-2">
+                            <div class="col">
+                                <div class="card h-100">
+                                    <div class="card-header bg-success text-white">
+                                        <h5 class="text-center">30 Days</h5>
+                                    </div>
+                                    <div class="card-body text-center">
+                                        <h3 class="card-title">15,000 BIF</h3>
+                                        <button type="submit" name="period" value="30" class="btn btn-primary mt-3">Choose Plan</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white">
+                                        <h5 class="text-center">60 Days</h5>
+                                    </div>
+                                    <div class="card-body text-center">
+                                        <h3 class="card-title">30,000 BIF</h3>
+                                        <button type="submit" name="period" value="60" class="btn btn-primary mt-3">Choose Plan</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card h-100">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h5 class="text-center">120 Days</h5>
+                                    </div>
+                                    <div class="card-body text-center">
+                                        <h3 class="card-title">60,000 BIF</h3>
+                                        <button type="submit" name="period" value="120" class="btn btn-primary mt-3">Choose Plan</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card h-100">
+                                    <div class="card-header bg-danger text-white">
+                                        <h5 class="text-center">180 Days</h5>
+                                    </div>
+                                    <div class="card-body text-center">
+                                        <h3 class="card-title">75,000 BIF</h3>
+                                        <button type="submit" name="period" value="180" class="btn btn-primary mt-3">Choose Plan</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

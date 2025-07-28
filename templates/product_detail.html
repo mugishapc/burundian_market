@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ product.title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        {% if product.image %}
+            <img src="{{ url_for('static', filename=product.image) }}" 
+                 class="img-fluid rounded" 
+                 alt="{{ product.title }}"
+                 style="max-height: 500px; object-fit: contain;">
+        {% else %}
+            <div class="bg-secondary d-flex align-items-center justify-content-center" 
+                 style="height: 300px; width: 100%;">
+                <span class="text-white">No Image Available</span>
+            </div>
+        {% endif %}
+    </div>
+    <div class="col-md-6">
+        <h2>{{ product.title }}</h2>
+        <p class="text-muted">{{ product.category }}</p>
+        <h3 class="text-success my-4">{{ product.price }} BIF</h3>
+        
+        <div class="mb-4">
+            <h4>Description</h4>
+            <p>{{ product.description }}</p>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Seller Information</h5>
+                <p class="card-text">
+                    <strong>Name:</strong> {{ seller.username }}<br>
+                    <strong>Status:</strong> 
+                    <span class="badge bg-{{ 'success' if seller.is_verified else 'warning' }}">
+                        {{ 'Verified Seller' if seller.is_verified else 'Not Verified' }}
+                    </span>
+                </p>
+                {% if seller.phone %}
+                <a href="https://wa.me/{{ seller.phone }}" 
+                   class="btn btn-success" 
+                   target="_blank"
+                   style="background-color: #25D366; border-color: #25D366;">
+                   <i class="fab fa-whatsapp"></i> Contact via WhatsApp
+                </a>
+                {% else %}
+                <button class="btn btn-secondary" disabled>
+                    No contact available
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if is_seller %}
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Edit Product
+            </a>
+            <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger" 
+                        onclick="return confirm('Are you sure you want to delete this product?');">
+                    <i class="fas fa-trash"></i> Delete Product
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if similar_products %}
+<div class="mt-5">
+    <h3>Similar Products</h3>
+    <div class="row">
+        {% for similar in similar_products %}
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <a href="{{ url_for('product_detail', product_id=similar.id) }}">
+                    {% if similar.image %}
+                    <img src="{{ url_for('static', filename=similar.image) }}" 
+                         class="card-img-top" 
+                         alt="{{ similar.title }}"
+                         style="height: 200px; object-fit: cover;">
+                    {% else %}
+                    <div class="card-img-top bg-secondary" style="height: 200px;"></div>
+                    {% endif %}
+                </a>
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <a href="{{ url_for('product_detail', product_id=similar.id) }}" class="text-decoration-none">
+                            {{ similar.title }}
+                        </a>
+                    </h5>
+                    <p class="card-text text-success fw-bold">{{ similar.price }} BIF</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
