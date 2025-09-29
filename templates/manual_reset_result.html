@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Password Reset Link Generated</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>For user:</strong> {{ email }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Reset Link:</strong></label>
+                        <input type="text" class="form-control" value="{{ reset_url }}" readonly>
+                    </div>
+                    <p class="text-muted">Share this link with the user. It will expire in 1 hour.</p>
+                    <a href="{{ url_for('admin_manual_reset') }}" class="btn btn-primary">Generate Another</a>
+                    <a href="{{ url_for('login') }}" class="btn btn-secondary">Back to Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

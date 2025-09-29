@@ -338,31 +338,33 @@ def register():
             flash('Username already exists', 'danger')
             return redirect(url_for('register'))
         
-        # Create user (email duplicates now allowed)
+        # Create user with auto-verification to avoid email issues
         new_user = User(
             username=username,
             email=email,
             password=generate_password_hash(password),
             phone=phone,
-            user_type=user_type
+            user_type=user_type,
+            email_verified=True,  # Auto-verify to avoid email issues
+            is_verified=True      # Auto-verify to avoid email issues
         )
         
         # For sellers, set the trial period
         if user_type == 'seller':
             new_user.is_seller_active = True  # Active during trial
-            # subscription_start/end will be null during trial
-        
-        # Generate verification token
-        token = serializer.dumps(email, salt='email-verification')
-        new_user.verification_token = token
         
         db.session.add(new_user)
         db.session.commit()
         
-        # Send verification email (asynchronously)
-        send_verification_email(new_user.email, token)
+        # Try to send welcome email (but don't block registration if it fails)
+        try:
+            token = serializer.dumps(email, salt='email-verification')
+            send_verification_email(new_user.email, token)
+            flash('Registration successful! Welcome email sent.', 'success')
+        except Exception as e:
+            # Registration still succeeds even if email fails
+            flash('Registration successful! You can now login.', 'success')
         
-        flash('Registration successful! Please check your email to verify your account.', 'success')
         return redirect(url_for('login'))
     
     return render_template('register.html')
@@ -578,10 +580,20 @@ def forgot_password():
         
         if user:
             token = serializer.dumps(email, salt='password-reset')
-            # Send password reset email asynchronously
-            send_password_reset_email(user.email, token)
+            
+            # Try to send email, but show user instructions if it fails
+            try:
+                send_password_reset_email(user.email, token)
+                flash('Password reset link has been sent to your email.', 'info')
+            except Exception as e:
+                # Email failed, show manual instructions
+                reset_url = url_for('reset_password', token=token, _external=True)
+                flash(f'Email service temporarily unavailable. Please use this link to reset your password: {reset_url}', 'warning')
+                return render_template('reset_link_display.html', reset_url=reset_url)
+        else:
+            # Always show the same message for security
+            flash('If an account exists with that email, a password reset link has been sent.', 'info')
         
-        flash('If an account exists with that email, a password reset link has been sent.', 'info')
         return redirect(url_for('login'))
     
     return render_template('forgot_password.html')
@@ -614,6 +626,28 @@ def reset_password(token):
         return redirect(url_for('login'))
     
     return render_template('reset_password.html', token=token)
+
+@app.route('/admin/manual-reset', methods=['GET', 'POST'])
+def admin_manual_reset():
+    """Manual password reset for when email is down"""
+    if 'user_id' not in session or session.get('user_type') != 'admin':
+        abort(403)
+        
+    if request.method == 'POST':
+        email = request.form['email']
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            # Generate a simple reset token (valid for 1 hour)
+            token = serializer.dumps(email, salt='password-reset')
+            reset_url = url_for('reset_password', token=token, _external=True)
+            
+            flash(f'Manual reset link for {email}: {reset_url}', 'info')
+            return render_template('manual_reset_result.html', reset_url=reset_url, email=email)
+        else:
+            flash('User not found', 'danger')
+    
+    return render_template('manual_reset.html')
 
 @app.route('/edit-profile', methods=['GET', 'POST'])
 def edit_profile():

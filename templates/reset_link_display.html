@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Password Reset Link</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <strong>Note:</strong> Email service is temporarily unavailable. Please use the link below to reset your password.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Reset Link:</strong></label>
+                        <input type="text" class="form-control" value="{{ reset_url }}" readonly>
+                        <small class="form-text text-muted">This link will expire in 1 hour.</small>
+                    </div>
+                    <a href="{{ reset_url }}" class="btn btn-primary" target="_blank">Reset Password</a>
+                    <a href="{{ url_for('login') }}" class="btn btn-secondary">Back to Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
