@@ -170,15 +170,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function checkExistingSession() {
-        fetch('/check-session', {
+        fetch('/checksession', {
             credentials: 'same-origin',
             method: 'GET'
         })
         .then(response => response.json())
         .then(data => {
-            if (data.authenticated) {
-                // Redirect to appropriate dashboard
-                window.location.href = data.redirect_url || '/dashboard';
+            if (data.status === 'active') {
+                // User has active session, redirect to appropriate dashboard
+                const userType = '{{ session.get("user_type", "") }}';
+                let redirectUrl = '/';
+                
+                if (userType === 'admin') redirectUrl = '/admin/dashboard';
+                else if (userType === 'seller') redirectUrl = '/seller/dashboard';
+                else if (userType === 'buyer') redirectUrl = '/buyer/dashboard';
+                
+                window.location.href = redirectUrl;
             }
         })
         .catch(error => {
@@ -187,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function checkSessionStatus() {
-        fetch('/session-check', {
+        fetch('/checksession', {
             credentials: 'same-origin'
         })
         .then(response => response.json())

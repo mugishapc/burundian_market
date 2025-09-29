@@ -1,34 +1,43 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import datetime
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from flask_wtf.csrf import CSRFProtect
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Mail, Message
 from flask import abort
 from datetime import datetime, timedelta
-from flask import make_response
-from sqlalchemy import func
-from flask_migrate import Migrate
+from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
 
 app = Flask(__name__)
 csrf = CSRFProtect(app)
 
-# Configuration
+# Configuration - Using environment variables properly
 app.secret_key = os.environ.get('SECRET_KEY', 'd29c234ca310aa6990092d4b6cd4c4854585c51e1f73bf4de510adca03f5bc4e')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///market.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 300,
+    'pool_pre_ping': True
+}
+
+# Email Configuration
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = ('mugishapc1@gmail.com')
-app.config['MAIL_PASSWORD'] = ('ovle ndkq vyfh jwxr')
-app.config['MAIL_DEFAULT_SENDER'] = 'mugishapc1@gmail.com'
-app.config['SECURITY_PASSWORD_SALT'] = ('SECURITY_PASSWORD_SALT', 'default-salt-for-dev')
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Sessions last 1 day
-app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh session with each request
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
+
+# Security Configuration
+app.config['SECURITY_PASSWORD_SALT'] = os.environ.get('SECURITY_PASSWORD_SALT', 'default-salt-for-dev')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['PREFERRED_URL_SCHEME'] = 'https'
@@ -37,28 +46,10 @@ app.config['REMEMBER_COOKIE_SECURE'] = True
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
 
-
-# Initialize extensions
+# Initialize extensions (NO MIGRATE!)
 db = SQLAlchemy(app)
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
-migrate = Migrate(app, db)
-
-@app.before_request
-def refresh_session():
-    if 'user_id' in session:
-        # Refresh session if it's about to expire
-        session.modified = True
-        
-        # Check if user still exists
-        user = User.query.get(session['user_id'])
-        if not user:
-            session.clear()
-            return redirect(url_for('login'))
-        
-        # Update session with current user data
-        session['user_type'] = user.user_type
-        session['username'] = user.username
 
 # Database Models
 class User(db.Model):
@@ -78,8 +69,7 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     last_activity = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     session_token = db.Column(db.String(255))
-
-
+    remember_token = db.Column(db.String(255))
 
     # New fields for seller subscription
     is_seller_active = db.Column(db.Boolean, default=True)
@@ -92,7 +82,6 @@ class User(db.Model):
     def is_active(self):
         """Check if user session should still be valid"""
         return datetime.now() - self.last_active < timedelta(hours=1)
-
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -114,7 +103,50 @@ class Product(db.Model):
     def __repr__(self):
         return f'<Product {self.title}>'
 
-# Create tables
+# DIRECT DATABASE INITIALIZATION - NO MIGRATIONS!
+def initialize_database():
+    """Initialize database tables directly"""
+    with app.app_context():
+        try:
+            print("🚀 Initializing database...")
+            
+            # Drop alembic_version table if it exists
+            try:
+                db.engine.execute('DROP TABLE IF EXISTS alembic_version')
+                print("✅ Removed alembic_version table")
+            except Exception as e:
+                print(f"ℹ️  No alembic_version table to remove: {e}")
+            
+            # Create all tables
+            db.create_all()
+            print("✅ Created all tables")
+            
+            # Create admin user if not exists
+            from werkzeug.security import generate_password_hash
+            if not User.query.filter_by(email='mpc0679@gmail.com').first():
+                admin = User(
+                    username='TEAM MANAGEMENT',
+                    email='mpc0679@gmail.com',
+                    password=generate_password_hash('61Mpc588214#'),
+                    user_type='admin',
+                    is_verified=True,
+                    email_verified=True
+                )
+                db.session.add(admin)
+                db.session.commit()
+                print("✅ Admin user created")
+            else:
+                print("✅ Admin user already exists")
+            
+            print("🎉 Database initialized successfully!")
+            
+        except Exception as e:
+            print(f"❌ Database initialization error: {e}")
+            import traceback
+            traceback.print_exc()
+
+# Initialize database when app starts
+initialize_database()
 
 # Helper Functions
 def send_verification_email(email, token):
@@ -148,6 +180,57 @@ def home():
         User.is_seller_active == True
     ).order_by(Product.created_at.desc()).limit(8).all()
     return render_template('index.html', products=products)
+
+@app.route('/test-db')
+def test_db():
+    try:
+        users_count = User.query.count()
+        products_count = Product.query.count()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Database working without migrations!',
+            'users_count': users_count,
+            'products_count': products_count
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Database error: {str(e)}'
+        }), 500
+
+@app.route('/check-tables')
+def check_tables():
+    try:
+        tables = db.engine.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """).fetchall()
+        
+        table_list = [table[0] for table in tables]
+        return jsonify({
+            'tables': table_list,
+            'count': len(table_list)
+        })
+    except Exception as e:
+        return f'Error: {e}'
+
+@app.before_request
+def refresh_session():
+    if 'user_id' in session:
+        # Refresh session if it's about to expire
+        session.modified = True
+        
+        # Check if user still exists
+        user = User.query.get(session['user_id'])
+        if not user:
+            session.clear()
+            return redirect(url_for('login'))
+        
+        # Update session with current user data
+        session['user_type'] = user.user_type
+        session['username'] = user.username
 
 @app.route('/products/search')
 def product_search():
@@ -197,8 +280,6 @@ def product_search():
         selected_category=None  # No category selected when doing general search
     )
 
-
-# In app.py, update the register route
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -357,7 +438,6 @@ def check_persistent_login():
                 # Token is invalid - clear the cookie
                 pass
 
-
 @app.route('/logout')
 def logout():
     if 'user_id' in session:
@@ -445,8 +525,6 @@ def product_detail(product_id):
     is_seller = 'user_id' in session and session['user_id'] == product.seller_id
     
     return render_template('product_detail.html', product=product, seller=seller, is_seller=is_seller)
-
-
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
@@ -593,8 +671,6 @@ def delete_product(product_id):
     db.session.commit()
     flash('Product deleted successfully', 'success')
     return redirect(url_for('seller_dashboard'))
-
-# In app.py, add these new routes
 
 # Admin Dashboard
 @app.route('/admin/dashboard')
@@ -758,7 +834,6 @@ def admin_send_message(user_id):
             flash('Failed to send message. Please try again.', 'danger')
     
     return render_template('admin_send_message.html', user=user)
-# In app.py, add these routes
 
 # Seller Subscription Page
 @app.route('/seller/subscribe')
@@ -876,7 +951,6 @@ def about():
 def privacy_policy():
     return render_template('privacy_policy.html')
 
-# Add this with your other routes
 @app.route('/cookie-preferences', methods=['GET', 'POST'])
 def cookie_preferences():
     if request.method == 'POST':
@@ -889,7 +963,7 @@ def cookie_preferences():
         response.set_cookie(
             'cookie_preferences',
             value=f'analytics:{analytics}|functional:{functional}',
-            expires=datetime.now() + timedelta(days=365),  # Now using datetime correctly
+            expires=datetime.now() + timedelta(days=365),
             httponly=True,
             samesite='Lax'
         )
@@ -910,15 +984,6 @@ def cookie_preferences():
             preferences[key] = value
     
     return render_template('cookie_preferences.html', preferences=preferences)
-
-
- #Add these new categories (update your cookie_preferences route accordingly)
-COOKIE_CATEGORIES = {
-    'essential': {'required': True, 'description': 'Necessary for basic functionality'},
-    'functional': {'required': False, 'description': 'Enhances user experience'},
-    'analytics': {'required': False, 'description': 'Website usage analytics'},
-    'marketing': {'required': False, 'description': 'Personalized ads and content'}
-}
 
 @app.route('/keepalive', methods=['POST'])
 def keepalive():
@@ -941,7 +1006,6 @@ def check_session():
 @app.route('/terms')
 def terms():
     return render_template('terms.html', now=datetime.now())
-
 
 if __name__ == '__main__':
     app.run(debug=True)

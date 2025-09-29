@@ -6,10 +6,10 @@ with app.app_context():
     db.create_all()  # creates all tables for known models
 
     # Add a default admin if not exists
-    if not User.query.filter_by(email='mugishapc1@gmail.com').first():
+    if not User.query.filter_by(email='mpc0679@gmail.com').first():
         admin = User(
             username='TEAM MANAGEMENT',
-            email='mugishapc1@gmail.com',
+            email='mpc0679@gmail.com',
             password=generate_password_hash('61Mpc588214#'),
             user_type='admin',
             is_verified=True,
