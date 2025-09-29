@@ -10,6 +10,9 @@ from flask_mail import Mail, Message
 from flask import abort
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import threading
+import time
+import smtplib
 
 # Load environment variables first
 load_dotenv()
@@ -26,13 +29,14 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True
 }
 
-# Email Configuration
+# Email Configuration with timeout
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_TIMEOUT'] = 30  # 30 seconds timeout
 
 # Security Configuration
 app.config['SECURITY_PASSWORD_SALT'] = os.environ.get('SECURITY_PASSWORD_SALT', 'default-salt-for-dev')
@@ -148,30 +152,70 @@ def initialize_database():
 # Initialize database when app starts
 initialize_database()
 
-# Helper Functions
+# Asynchronous Email Functions
+def send_async_email(app, msg, max_retries=3):
+    """Send email in background thread with retry logic"""
+    def send_with_retry():
+        for attempt in range(max_retries):
+            try:
+                with app.app_context():
+                    mail.send(msg)
+                print(f"✅ Email sent successfully (attempt {attempt + 1})")
+                break
+            except smtplib.SMTPException as e:
+                print(f"❌ Email attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    print(f"❌ Failed to send email after {max_retries} attempts: {e}")
+            except Exception as e:
+                print(f"❌ Unexpected email error (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    print(f"❌ Final email failure after {max_retries} attempts: {e}")
+    
+    # Start the email sending in background thread
+    thread = threading.Thread(target=send_with_retry)
+    thread.daemon = True
+    thread.start()
+
 def send_verification_email(email, token):
+    """Send email verification asynchronously"""
     verify_url = url_for('verify_email', token=token, _external=True)
-    msg = Message('Verify Your Email Address', recipients=[email])
-    msg.body = f'''Welcome to Burundian Market!
+    msg = Message(
+        'Verify Your Email Address', 
+        recipients=[email],
+        body=f'''Welcome to Burundian Market!
     
 Please click the following link to verify your email address:
 {verify_url}
 
 If you did not create an account, please ignore this email.
 '''
-    mail.send(msg)
+    )
+    send_async_email(app, msg)
 
 def send_password_reset_email(email, token):
+    """Send password reset email asynchronously"""
     reset_url = url_for('reset_password', token=token, _external=True)
-    msg = Message('Password Reset Request', recipients=[email])
-    msg.body = f'''To reset your password, visit the following link:
+    msg = Message(
+        'Password Reset Request', 
+        recipients=[email],
+        body=f'''To reset your password, visit the following link:
 {reset_url}
 
 This link will expire in 1 hour.
 
 If you did not request a password reset, please ignore this email.
 '''
-    mail.send(msg)
+    )
+    send_async_email(app, msg)
+
+def send_notification_email(recipient, subject, body):
+    """Send general notification email asynchronously"""
+    msg = Message(subject, recipients=[recipient], body=body)
+    send_async_email(app, msg)
 
 # Routes
 @app.route('/')
@@ -315,7 +359,7 @@ def register():
         db.session.add(new_user)
         db.session.commit()
         
-        # Send verification email
+        # Send verification email (asynchronously)
         send_verification_email(new_user.email, token)
         
         flash('Registration successful! Please check your email to verify your account.', 'success')
@@ -534,6 +578,7 @@ def forgot_password():
         
         if user:
             token = serializer.dumps(email, salt='password-reset')
+            # Send password reset email asynchronously
             send_password_reset_email(user.email, token)
         
         flash('If an account exists with that email, a password reset link has been sent.', 'info')
@@ -781,20 +826,16 @@ def admin_activate_seller(user_id):
         
         db.session.commit()
         
-        # Send notification email
+        # Send notification email asynchronously
         try:
-            msg = Message(
-                'Your Subscription Has Been Activated',
-                recipients=[seller.email]
-            )
-            msg.body = f'''Hello {seller.username},
+            body = f'''Hello {seller.username},
             
 Your subscription has been activated for {days} days (until {seller.subscription_end.strftime('%B %d, %Y')}).
 You can now publish your products on Burundian Market.
 
 Thank you for using our service!
 '''
-            mail.send(msg)
+            send_notification_email(seller.email, 'Your Subscription Has Been Activated', body)
         except Exception as e:
             app.logger.error(f"Error sending email to {seller.email}: {str(e)}")
         
@@ -822,10 +863,8 @@ def admin_send_message(user_id):
             return redirect(url_for('admin_send_message', user_id=user_id))
         
         try:
-            # Send email
-            msg = Message(subject, recipients=[user.email])
-            msg.body = message
-            mail.send(msg)
+            # Send email asynchronously
+            send_notification_email(user.email, subject, message)
             
             flash('Message sent successfully!', 'success')
             return redirect(url_for('admin_view_user', user_id=user_id))
@@ -893,45 +932,41 @@ def check_seller_subscription():
                 user.is_seller_active = False
                 db.session.commit()
 
-                # Notify seller
-                msg = Message('Your Trial Period Has Ended', recipients=[user.email])
-                msg.body = f'''Hello {user.username},
+                # Notify seller asynchronously
+                seller_body = f'''Hello {user.username},
                 
 Your 5-day trial period has ended. To continue publishing products, please subscribe to one of our plans.
 
 Thank you for using Burundian Market!
 '''
-                mail.send(msg)
+                send_notification_email(user.email, 'Your Trial Period Has Ended', seller_body)
                 
-                # Notify admin
-                msg = Message('Seller Trial Period Ended', recipients=['mugishapc1@gmail.com'])
-                msg.body = f'''Admin,
+                # Notify admin asynchronously
+                admin_body = f'''Admin,
                 
 Seller {user.username} (ID: {user.id}) has ended their trial period and needs to subscribe.
 '''
-                mail.send(msg)
+                send_notification_email('mugishapc1@gmail.com', 'Seller Trial Period Ended', admin_body)
         
         # If subscription is ending in 5 days
         elif user.is_seller_active and user.subscription_end:
             days_left = (user.subscription_end - datetime.now()).days
             if days_left == 5:
-                # Notify seller
-                msg = Message('Your Subscription is Ending Soon', recipients=[user.email])
-                msg.body = f'''Hello {user.username},
+                # Notify seller asynchronously
+                seller_body = f'''Hello {user.username},
                 
 Your subscription will end in 5 days. Please renew to avoid service interruption.
 
 Thank you for using Burundian Market!
 '''
-                mail.send(msg)
+                send_notification_email(user.email, 'Your Subscription is Ending Soon', seller_body)
                 
-                # Notify admin
-                msg = Message('Seller Subscription Ending Soon', recipients=['mugishapc1@gmail.com'])
-                msg.body = f'''Admin,
+                # Notify admin asynchronously
+                admin_body = f'''Admin,
                 
 Seller {user.username} (ID: {user.id}) has only 5 days left in their subscription.
 '''
-                mail.send(msg)
+                send_notification_email('mugishapc1@gmail.com', 'Seller Subscription Ending Soon', admin_body)
         
         # Redirect to subscription page if not active
         if not user.is_seller_active and request.endpoint not in ['seller_subscribe', 'choose_subscription', 'logout', 'static']:
