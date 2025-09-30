@@ -179,7 +179,7 @@
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     
     <script>
-        // Enhanced image error handling with retry logic
+        // Enhanced image error handling - NO PLACEHOLDER FALLBACK
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Base template loaded - initializing image handlers');
             
@@ -200,12 +200,9 @@
                         this.src = originalSrc.split('?')[0] + separator + 'retry=' + retryCount + '&t=' + timestamp;
                         console.log(`Retrying image load (${retryCount}/${maxRetries}):`, this.src);
                     } else {
-                        // Final fallback
-                        if (!this.src.includes('placeholder.svg')) {
-                            this.src = '{{ url_for("static", filename="images/placeholder.svg") }}?v=1';
-                            this.classList.add('image-failed');
-                            console.log('Using placeholder for failed image');
-                        }
+                        // Final fallback - just hide the image, no placeholder
+                        console.log('Image failed after retries, hiding:', this.src);
+                        this.style.display = 'none';
                     }
                 });
                 

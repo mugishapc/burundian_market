@@ -1,4 +1,4 @@
-// Enhanced form validation and image handling
+// Enhanced form validation and image handling - NO PLACEHOLDER
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Script loaded - initializing enhanced image handling');
 
@@ -119,12 +119,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 30000);
     
-    // Enhanced error handling for all images
+    // Enhanced error handling for all images - NO PLACEHOLDER
     document.querySelectorAll('img').forEach(img => {
         if (img.classList.contains('product-image')) {
             img.addEventListener('error', function() {
                 console.warn('Product image failed:', this.src);
-                // Don't replace with placeholder for product images - let retry logic handle it
+                this.style.display = 'none'; // Hide failed images, no placeholder
             });
         }
     });

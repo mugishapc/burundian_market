@@ -26,13 +26,6 @@ body {
     opacity: 1;
 }
 
-.product-image.image-failed {
-    background: #f8f9fa;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
 @keyframes loading {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }

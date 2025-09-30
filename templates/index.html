@@ -22,13 +22,12 @@
                          class="card-img-top product-image no-cache-img" 
                          alt="{{ product.title }}"
                          style="height: 200px; object-fit: cover;"
-                         loading="lazy"
-                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.svg') }}?v=1'; this.classList.add('image-failed');">
+                         loading="lazy">
                 {% else %}
                     <div class="image-placeholder card-img-top d-flex align-items-center justify-content-center">
                         <div class="text-center">
                             <i class="fas fa-image fa-2x text-muted mb-2"></i>
-                            <p class="text-muted mb-0">No Image</p>
+                            <p class="text-muted mb-0">No Image Available</p>
                         </div>
                     </div>
                 {% endif %}
@@ -59,7 +58,7 @@
 </div>
 
 <script>
-    // Enhanced image loading with session awareness
+    // Enhanced image loading with session awareness - NO PLACEHOLDER
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Home page loaded - initializing image handling');
         
@@ -77,11 +76,10 @@
                     img.src = cleanUrl + '?cache=' + timestamp + '&session=' + timestamp;
                     reloadCount++;
                     
-                    // Enhanced error handling
+                    // Enhanced error handling - NO PLACEHOLDER
                     img.onerror = function() {
                         console.warn('Image failed to load:', this.src);
-                        this.src = '{{ url_for("static", filename="images/placeholder.svg") }}?v=2';
-                        this.classList.add('image-load-failed');
+                        this.style.display = 'none'; // Hide failed images, no placeholder
                     };
                     
                     img.onload = function() {
@@ -123,12 +121,6 @@
     .image-loaded {
         opacity: 1;
         transition: opacity 0.3s ease-in-out;
-    }
-    .image-load-failed {
-        background: #f8f9fa;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
 </style>
 {% endblock %}

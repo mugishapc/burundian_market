@@ -431,14 +431,14 @@ def serve_uploaded_files(filename):
         response.headers['Pragma'] = 'cache'
         return response
     except FileNotFoundError:
-        # Return a placeholder image if file not found
-        return send_from_directory(os.path.join(app.root_path, 'static'), 'images/placeholder.svg')
+        # Return 404 instead of placeholder
+        abort(404)
 
-# NEW: Function to get absolute image URL with cache busting
+# NEW: Function to get absolute image URL with cache busting - NO PLACEHOLDER
 def get_image_url(image_path):
-    """Get absolute URL for product images with cache busting"""
+    """Get absolute URL for product images with cache busting - NO PLACEHOLDER"""
     if not image_path:
-        return url_for('static', filename='images/placeholder.svg') + '?v=1'
+        return None  # Return None instead of placeholder
     
     # If it's a relative path, serve via our uploads route
     if image_path.startswith('uploads/'):
