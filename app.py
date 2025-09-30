@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, make_response, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
@@ -13,7 +13,9 @@ from dotenv import load_dotenv
 import threading
 import time
 import smtplib
-import urllib.parse
+import base64
+import io
+from PIL import Image
 
 # Load environment variables first
 load_dotenv()
@@ -124,7 +126,8 @@ class Product(db.Model):
     description = db.Column(db.Text, nullable=True)
     price = db.Column(db.Float, nullable=False)
     category = db.Column(db.String(50), nullable=True)
-    image = db.Column(db.String(200), nullable=True)
+    image_data = db.Column(db.Text, nullable=True)  # Store base64 encoded image
+    image_filename = db.Column(db.String(200), nullable=True)
     seller_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     
@@ -144,23 +147,35 @@ def initialize_database():
             inspector = db.inspect(db.engine)
             existing_tables = inspector.get_table_names()
             
-            if 'users' in existing_tables:
+            if 'products' in existing_tables:
                 print("ℹ️  Tables already exist, checking for schema updates...")
                 
-                # Check if last_notification_sent column exists
-                users_columns = [col['name'] for col in inspector.get_columns('users')]
+                # Check if image_data column exists
+                product_columns = [col['name'] for col in inspector.get_columns('products')]
                 
+                if 'image_data' not in product_columns:
+                    print("🔄 Adding missing columns: image_data and image_filename")
+                    try:
+                        # Add the missing columns using raw SQL
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE products ADD COLUMN image_data TEXT'))
+                            conn.execute(text('ALTER TABLE products ADD COLUMN image_filename VARCHAR(200)'))
+                            conn.commit()
+                        print("✅ Added image_data and image_filename columns")
+                    except Exception as e:
+                        print(f"⚠️  Could not add columns: {e}")
+                
+                # Check if last_notification_sent column exists in users
+                users_columns = [col['name'] for col in inspector.get_columns('users')]
                 if 'last_notification_sent' not in users_columns:
                     print("🔄 Adding missing column: last_notification_sent")
                     try:
-                        # Add the missing column using raw SQL
                         with db.engine.connect() as conn:
                             conn.execute(text('ALTER TABLE users ADD COLUMN last_notification_sent TIMESTAMP'))
                             conn.commit()
                         print("✅ Added last_notification_sent column")
                     except Exception as e:
                         print(f"⚠️  Could not add column: {e}")
-                        # Continue anyway - the app will work without the new column
                 
                 # Create admin user if not exists - using safer approach
                 try:
@@ -415,47 +430,46 @@ def startup_tasks():
         check_all_subscriptions()
         startup_done = True
 
-# CRITICAL FIX: Enhanced static file serving for uploaded images
-@app.route('/uploads/<path:filename>')
-def serve_uploaded_files(filename):
-    """Serve uploaded files with proper caching and security"""
+# NEW: Function to process and store images as base64
+def process_image(image_file):
+    """Process uploaded image and return base64 data"""
+    if not image_file or image_file.filename == '':
+        return None, None
+    
     try:
-        # Ensure the uploads directory exists
-        uploads_dir = os.path.join(app.root_path, 'static', 'uploads')
-        if not os.path.exists(uploads_dir):
-            os.makedirs(uploads_dir)
-            
-        response = send_from_directory(uploads_dir, filename)
-        # Set proper caching headers - ALLOW CACHING for images
-        response.headers['Cache-Control'] = 'public, max-age=3600'  # 1 hour cache
-        response.headers['Pragma'] = 'cache'
-        return response
-    except FileNotFoundError:
-        # Return 404 instead of placeholder
-        abort(404)
+        # Read image file
+        image_data = image_file.read()
+        
+        # Convert to base64
+        base64_data = base64.b64encode(image_data).decode('utf-8')
+        
+        # Get filename
+        filename = image_file.filename
+        
+        return base64_data, filename
+    except Exception as e:
+        print(f"Error processing image: {e}")
+        return None, None
 
-# NEW: Function to get absolute image URL with cache busting - NO PLACEHOLDER
-def get_image_url(image_path):
-    """Get absolute URL for product images with cache busting - NO PLACEHOLDER"""
-    if not image_path:
-        return None  # Return None instead of placeholder
+# NEW: Function to get image URL for templates
+def get_image_url(product):
+    """Get image URL for product - uses base64 data URL"""
+    if not product.image_data:
+        return url_for('static', filename='images/placeholder.jpg')
     
-    # If it's a relative path, serve via our uploads route
-    if image_path.startswith('uploads/'):
-        filename = image_path.replace('uploads/', '')
-        return url_for('serve_uploaded_files', filename=filename) + '?t=' + str(int(time.time()))
-    
-    return url_for('static', filename=image_path) + '?t=' + str(int(time.time()))
+    # Return base64 data URL
+    return f"data:image/jpeg;base64,{product.image_data}"
 
 # Routes
 @app.route('/')
 def home():
-    # MODIFIED: Show ALL products regardless of seller status
-    products = Product.query.order_by(Product.created_at.desc()).limit(8).all()
+    products = Product.query.join(User).filter(
+        User.is_seller_active == True
+    ).order_by(Product.created_at.desc()).limit(8).all()
     
-    # Ensure proper image URLs with cache busting
+    # Ensure proper image URLs
     for product in products:
-        product.image_url = get_image_url(product.image)
+        product.image_url = get_image_url(product)
     
     return render_template('index.html', products=products)
 
@@ -516,8 +530,10 @@ def product_search():
     page = request.args.get('page', 1, type=int)
     per_page = 12  # Products per page
 
-    # MODIFIED: Show ALL products regardless of seller status
-    products_query = Product.query
+    # Base query - active sellers only
+    products_query = Product.query.join(User).filter(
+        User.is_seller_active == True
+    )
 
     # Apply search query filter (searches across all categories)
     if query:
@@ -550,7 +566,7 @@ def product_search():
     
     # Ensure proper image URLs for all products
     for product in products.items:
-        product.image_url = get_image_url(product.image)
+        product.image_url = get_image_url(product)
 
     return render_template(
         'product_search.html',
@@ -767,7 +783,7 @@ def seller_dashboard():
     
     # Ensure proper image URLs
     for product in products:
-        product.image_url = get_image_url(product.image)
+        product.image_url = get_image_url(product)
     
     # Get subscription status for display
     subscription_status = user.get_subscription_status()
@@ -775,8 +791,7 @@ def seller_dashboard():
     return render_template('seller_dashboard.html', 
                          user=user, 
                          products=products,
-                         subscription_status=subscription_status)  # Remove datetime parameter
-
+                         subscription_status=subscription_status)
 
 @app.route('/buyer/dashboard')
 def buyer_dashboard():
@@ -786,12 +801,11 @@ def buyer_dashboard():
     categories = db.session.query(Product.category.distinct()).filter(Product.category.isnot(None)).all()
     categories = [c[0] for c in categories if c[0]]
     
-    # MODIFIED: Show ALL products regardless of seller status
     products = Product.query.order_by(Product.created_at.desc()).all()
     
     # Ensure proper image URLs
     for product in products:
-        product.image_url = get_image_url(product.image)
+        product.image_url = get_image_url(product)
     
     return render_template('buyer_dashboard.html', products=products, categories=categories)
 
@@ -813,28 +827,21 @@ def add_product():
         price = float(request.form['price'])
         category = request.form.get('category')
         
-        # Handle image upload
+        # Handle image upload - store as base64 in database
         image = request.files.get('image')
-        image_url = None
+        image_data = None
+        image_filename = None
         
         if image and image.filename != '':
-            # Create uploads folder if it doesn't exist
-            upload_folder = os.path.join(app.root_path, 'static', 'uploads')
-            if not os.path.exists(upload_folder):
-                os.makedirs(upload_folder)
-            
-            # Secure filename and save
-            filename = f"product_{session['user_id']}_{int(time.time())}.jpg"
-            image_path = os.path.join(upload_folder, filename)
-            image.save(image_path)
-            image_url = f"uploads/{filename}"
+            image_data, image_filename = process_image(image)
         
         new_product = Product(
             title=title,
             description=description,
             price=price,
             category=category,
-            image=image_url,
+            image_data=image_data,
+            image_filename=image_filename,
             seller_id=session['user_id']
         )
         
@@ -851,21 +858,23 @@ def product_detail(product_id):
     product = db.session.query(Product).get_or_404(product_id)
     seller = db.session.query(User).get(product.seller_id)
     
-    # Ensure proper image URL with cache busting
-    product.image_url = get_image_url(product.image)
+    # Ensure proper image URL
+    product.image_url = get_image_url(product)
     
     # Check if the current user is the seller
     is_seller = 'user_id' in session and session['user_id'] == product.seller_id
     
-    # MODIFIED: Show similar products regardless of seller status
+    # Get similar products
     similar_products = Product.query.filter(
         Product.category == product.category,
-        Product.id != product.id
+        Product.id != product.id,
+        Product.seller_id == User.id,
+        User.is_seller_active == True
     ).limit(4).all()
     
     # Ensure proper image URLs for similar products
     for similar in similar_products:
-        similar.image_url = get_image_url(similar.image)
+        similar.image_url = get_image_url(similar)
     
     return render_template('product_detail.html', 
                          product=product, 
@@ -1024,18 +1033,17 @@ def edit_product(product_id):
         # Handle image update
         image = request.files.get('image')
         if image and image.filename != '':
-            upload_folder = os.path.join(app.root_path, 'static', 'uploads')
-            filename = f"product_{session['user_id']}_{product_id}_{int(time.time())}.jpg"
-            image_path = os.path.join(upload_folder, filename)
-            image.save(image_path)
-            product.image = f"uploads/{filename}"
+            image_data, image_filename = process_image(image)
+            if image_data:
+                product.image_data = image_data
+                product.image_filename = image_filename
         
         db.session.commit()
         flash('Product updated successfully!', 'success')
         return redirect(url_for('seller_dashboard'))
     
     # Ensure proper image URL for editing
-    product.image_url = get_image_url(product.image)
+    product.image_url = get_image_url(product)
     
     return render_template('edit_product.html', product=product)
 
@@ -1047,15 +1055,6 @@ def delete_product(product_id):
     product = db.session.query(Product).get_or_404(product_id)
     if product.seller_id != session['user_id']:
         abort(403)  # Forbidden for other sellers
-    
-    # Delete product image if exists
-    if product.image:
-        try:
-            image_path = os.path.join(app.root_path, 'static', product.image)
-            if os.path.exists(image_path):
-                os.remove(image_path)
-        except:
-            pass
     
     db.session.delete(product)
     db.session.commit()
@@ -1093,16 +1092,13 @@ def admin_view_user(user_id):
     
     user = db.session.query(User).get_or_404(user_id)
     products = []
-    images = []
     
     if user.user_type == 'seller':
         products = Product.query.filter_by(seller_id=user.id).all()
-        # Get all images from products with proper URLs
-        images = [get_image_url(product.image) for product in products if product.image]
         
         # Ensure proper image URLs for products
         for product in products:
-            product.image_url = get_image_url(product.image)
+            product.image_url = get_image_url(product)
         
         # Calculate subscription status
         user.subscription_status = user.get_subscription_status()
@@ -1110,7 +1106,6 @@ def admin_view_user(user_id):
     return render_template('admin_user_detail.html', 
                          user=user, 
                          products=products,
-                         images=images,
                          datetime=datetime)
 
 @app.route('/admin/user/delete/<int:user_id>', methods=['POST'])
@@ -1124,15 +1119,6 @@ def admin_delete_user(user_id):
     try:
         # Delete user's products if they're a seller
         if user.user_type == 'seller':
-            # First delete product images
-            for product in user.products:
-                if product.image:
-                    try:
-                        image_path = os.path.join(app.root_path, 'static', product.image)
-                        if os.path.exists(image_path):
-                            os.remove(image_path)
-                    except:
-                        pass
             Product.query.filter_by(seller_id=user.id).delete()
         
         db.session.delete(user)
@@ -1140,7 +1126,7 @@ def admin_delete_user(user_id):
         flash(f'User {username} has been successfully deleted.', 'success')
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"Error deleting user {user_id}: {str(e)}")
+        print(f"Error deleting user {user_id}: {str(e)}")
         flash('Error deleting user. Please try again.', 'danger')
     
     return redirect(url_for('admin_dashboard'))
@@ -1181,12 +1167,12 @@ Thank you for using our service!
 '''
             send_notification_email(seller.email, 'Your Subscription Has Been Activated', body)
         except Exception as e:
-            app.logger.error(f"Error sending email to {seller.email}: {str(e)}")
+            print(f"Error sending email to {seller.email}: {str(e)}")
         
         flash('Seller subscription activated successfully!', 'success')
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"Error activating seller subscription: {str(e)}")
+        print(f"Error activating seller subscription: {str(e)}")
         flash('Error activating subscription. Please try again.', 'danger')
     
     return redirect(url_for('admin_view_user', user_id=user_id))
@@ -1298,7 +1284,7 @@ def check_seller_subscription():
             return redirect(url_for('seller_subscribe'))
             
     except Exception as e:
-        app.logger.error(f"Error in check_seller_subscription: {str(e)}")
+        print(f"Error in check_seller_subscription: {str(e)}")
         # Don't interrupt the request flow for minor errors
         return
 
@@ -1344,24 +1330,17 @@ def cookie_preferences():
     
     return render_template('cookie_preferences.html', preferences=preferences)
 
-# FIXED: Keepalive endpoint without CSRF protection
 @app.route('/keepalive', methods=['POST'])
-@csrf.exempt  # Exempt from CSRF protection
+@csrf.exempt
 def keepalive():
-    """Enhanced keepalive endpoint that handles session refresh properly"""
-    try:
-        if 'user_id' in session:
-            user = db.session.query(User).get(session['user_id'])
-            if user:
-                user.last_activity = datetime.utcnow()
-                db.session.commit()
-                # Refresh the session to extend its lifetime
-                session.modified = True
-                return jsonify({'status': 'active', 'user_id': user.id}), 200
-        return jsonify({'status': 'inactive'}), 200
-    except Exception as e:
-        print(f"Keepalive error: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    """Keep session alive - exempt from CSRF protection"""
+    if 'user_id' in session:
+        user = db.session.query(User).get(session['user_id'])
+        if user:
+            user.last_activity = datetime.utcnow()
+            db.session.commit()
+            return {'status': 'active'}, 200
+    return {'status': 'inactive'}, 401
 
 @app.route('/checksession')
 def check_session():
@@ -1374,25 +1353,6 @@ def check_session():
 @app.route('/terms')
 def terms():
     return render_template('terms.html', now=datetime.now())
-
-# NEW: Debug route to check image paths
-@app.route('/debug-images')
-def debug_images():
-    """Debug route to check image paths"""
-    products = Product.query.limit(5).all()
-    debug_info = []
-    
-    for product in products:
-        debug_info.append({
-            'id': product.id,
-            'title': product.title,
-            'image_path': product.image,
-            'static_url': url_for('static', filename=product.image) if product.image else None,
-            'uploads_url': url_for('serve_uploaded_files', filename=product.image.replace('uploads/', '')) if product.image and product.image.startswith('uploads/') else None,
-            'file_exists': os.path.exists(os.path.join(app.root_path, 'static', product.image)) if product.image else False
-        })
-    
-    return jsonify(debug_info)
 
 if __name__ == '__main__':
     app.run(debug=True)

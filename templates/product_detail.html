@@ -9,7 +9,7 @@
                  class="img-fluid rounded" 
                  alt="{{ product.title }}"
                  style="max-height: 500px; object-fit: contain;"
-                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}?v=1';">
+                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
         {% else %}
             <div class="bg-secondary d-flex align-items-center justify-content-center rounded" 
                  style="height: 300px; width: 100%;">
@@ -85,7 +85,7 @@
                          class="card-img-top" 
                          alt="{{ similar.title }}"
                          style="height: 200px; object-fit: cover;"
-                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}?v=1';">
+                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
                     {% else %}
                     <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="height: 200px;">
                         <i class="fas fa-image text-white fa-2x"></i>
@@ -106,15 +106,4 @@
     </div>
 </div>
 {% endif %}
-
-<script>
-    // Force reload main image
-    document.addEventListener('DOMContentLoaded', function() {
-        const mainImage = document.querySelector('.img-fluid.rounded');
-        if (mainImage && mainImage.src) {
-            const originalSrc = mainImage.src.split('?')[0];
-            mainImage.src = originalSrc + '?force=' + new Date().getTime();
-        }
-    });
-</script>
 {% endblock %}
