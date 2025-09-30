@@ -16,6 +16,8 @@ import smtplib
 import base64
 import io
 from PIL import Image
+from flask import flash
+
 
 # Load environment variables first
 load_dotenv()

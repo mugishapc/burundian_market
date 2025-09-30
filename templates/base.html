@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
+    <!-- Image caching fix -->
     <style>
         .product-image {
             width: 100%;
@@ -24,14 +25,42 @@
             font-size: 14px;
             height: 200px;
         }
-        .image-loading {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
+        
+        /* Flash message animations */
+        .alert {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+        
+        .alert-success {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        
+        .alert-danger {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .alert-warning {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .alert-info {
+            background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        /* Force image reloading after session changes */
+        img[src*="data:image"] {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
         }
     </style>
 </head>
@@ -106,31 +135,50 @@
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <!-- Flash Messages Container -->
+    <div class="container mt-3">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show">
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        <div class="d-flex align-items-center">
-                            {% if category == 'success' %}
-                                <i class="fas fa-check-circle me-2"></i>
-                            {% elif category == 'danger' %}
-                                <i class="fas fa-exclamation-circle me-2"></i>
-                            {% elif category == 'warning' %}
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                            {% else %}
-                                <i class="fas fa-info-circle me-2"></i>
-                            {% endif %}
-                            <span>{{ message }}</span>
+                <div id="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show flash-message" role="alert">
+                            <div class="d-flex align-items-center">
+                                {% if category == 'success' %}
+                                    <i class="fas fa-check-circle me-3 fa-lg"></i>
+                                {% elif category == 'danger' %}
+                                    <i class="fas fa-exclamation-circle me-3 fa-lg"></i>
+                                {% elif category == 'warning' %}
+                                    <i class="fas fa-exclamation-triangle me-3 fa-lg"></i>
+                                {% else %}
+                                    <i class="fas fa-info-circle me-3 fa-lg"></i>
+                                {% endif %}
+                                <div class="flex-grow-1">
+                                    <strong class="me-2">
+                                        {% if category == 'success' %}
+                                            Success!
+                                        {% elif category == 'danger' %}
+                                            Error!
+                                        {% elif category == 'warning' %}
+                                            Warning!
+                                        {% else %}
+                                            Info
+                                        {% endif %}
+                                    </strong>
+                                    {{ message }}
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                </div>
             {% endif %}
         {% endwith %}
-
-        {% block content %}{% endblock %}
     </div>
+
+    <!-- Main Content -->
+    <main class="container my-4">
+        {% block content %}{% endblock %}
+    </main>
 
     <footer class="bg-dark text-white mt-5 py-4">
         <div class="container">
@@ -158,11 +206,11 @@
                     <ul class="list-unstyled">
                         <li>
                             <i class="fas fa-phone me-2"></i> 
-                            <a href="tel:+25768596164" class="text-decoration-none">+257 68 596 164</a>
+                            <a href="tel:+25768596164" class="text-decoration-none text-white">+257 68 596 164</a>
                         </li>
                         <li>
                             <i class="fas fa-envelope me-2"></i> 
-                            <a href="mailto:mugishapc1@gmail.com" class="text-decoration-none">mpc0679@gmail.com</a>
+                            <a href="mailto:mugishapc1@gmail.com" class="text-decoration-none text-white">mugishapc1@gmail.com</a>
                         </li>
                     </ul>
                 </div>
@@ -175,60 +223,68 @@
         </div>
     </footer>
 
+    <!-- Cookie Consent Banner -->
+    <div id="cookieConsent" class="alert alert-dark text-center mb-0" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1050;">
+        <div class="container">
+            <div class="d-flex flex-column flex-md-row align-items-center justify-content-between">
+                <div class="mb-2 mb-md-0 text-start">
+                    We use cookies to enhance your experience. By continuing to browse, you agree to our use of cookies.
+                    <a href="{{ url_for('privacy_policy') }}" class="text-white ms-1">Learn more</a>
+                </div>
+                <div class="d-flex">
+                    <a href="{{ url_for('cookie_preferences') }}" class="btn btn-outline-light btn-sm me-2">
+                        Preferences
+                    </a>
+                    <button type="button" class="btn btn-primary btn-sm" id="acceptCookies">
+                        Accept All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     
+    <!-- Flash Messages Auto-close -->
     <script>
-        // Enhanced image error handling - NO PLACEHOLDER FALLBACK
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Base template loaded - initializing image handlers');
+            // Auto-hide flash messages after 5 seconds
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(message => {
+                setTimeout(() => {
+                    const bsAlert = new bootstrap.Alert(message);
+                    bsAlert.close();
+                }, 5000);
+            });
+
+            // Check if cookie consent is needed
+            if (!localStorage.getItem('cookieConsent') && !document.cookie.includes('cookie_preferences')) {
+                document.getElementById('cookieConsent').style.display = 'block';
+            }
             
-            // Add error handlers to all product images
-            document.querySelectorAll('.product-image').forEach(img => {
-                const originalSrc = img.src;
-                let retryCount = 0;
-                const maxRetries = 3;
-                
-                img.addEventListener('error', function() {
-                    console.warn('Image failed to load:', this.src);
-                    retryCount++;
-                    
-                    if (retryCount <= maxRetries) {
-                        // Add cache busting and retry
-                        const timestamp = new Date().getTime();
-                        const separator = this.src.includes('?') ? '&' : '?';
-                        this.src = originalSrc.split('?')[0] + separator + 'retry=' + retryCount + '&t=' + timestamp;
-                        console.log(`Retrying image load (${retryCount}/${maxRetries}):`, this.src);
-                    } else {
-                        // Final fallback - just hide the image, no placeholder
-                        console.log('Image failed after retries, hiding:', this.src);
-                        this.style.display = 'none';
-                    }
-                });
-                
-                img.addEventListener('load', function() {
-                    this.classList.add('image-loaded');
-                    this.classList.remove('image-loading');
-                    console.log('Image loaded successfully:', this.src);
-                });
-                
-                // Add loading state
-                if (!img.complete) {
-                    img.classList.add('image-loading');
-                }
+            // Accept cookies handler
+            document.getElementById('acceptCookies')?.addEventListener('click', function() {
+                localStorage.setItem('cookieConsent', 'true');
+                document.cookie = "cookie_preferences=analytics:on|functional:on; path=/; max-age=31536000; samesite=Lax";
+                document.getElementById('cookieConsent').style.display = 'none';
             });
             
-            // Global function to reload all images
-            window.reloadAllImages = function() {
-                console.log('Reloading all images...');
-                document.querySelectorAll('.product-image').forEach(img => {
-                    const originalSrc = img.src.split('?')[0];
-                    const timestamp = new Date().getTime();
-                    img.src = originalSrc + '?reload=' + timestamp;
-                });
-            };
+            // Session keep-alive
+            setInterval(() => {
+                fetch('{{ url_for("keepalive") }}', {
+                    method: 'POST',
+                    credentials: 'include'
+                }).catch(() => {});
+            }, 300000); // 5 minutes
         });
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
     </script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>
