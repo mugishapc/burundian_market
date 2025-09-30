@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
-    <!-- Image caching fix -->
     <style>
         .product-image {
             width: 100%;
@@ -24,17 +23,6 @@
             color: #6c757d;
             font-size: 14px;
             height: 200px;
-        }
-        
-        /* Force image reloading after session changes */
-        img[src*="uploads"] {
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-        }
-        
-        /* Cache busting for product images */
-        .product-img {
-            transform: translateZ(0);
         }
     </style>
 </head>
@@ -87,7 +75,7 @@
                         {% endif %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-user-circle"></i> Account
+                                <i class="fas fa-user-circle"></i> {{ session['username'] }}
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="{{ url_for('edit_profile') }}">Edit Profile</a></li>
@@ -166,7 +154,6 @@
                         <li>
                             <i class="fas fa-envelope me-2"></i> 
                             <a href="mailto:mugishapc1@gmail.com" class="text-decoration-none">mugishapc1@gmail.com</a>
-                            
                         </li>
                     </ul>
                 </div>
@@ -179,102 +166,21 @@
         </div>
     </footer>
 
-    <!-- Cookie Consent Banner -->
-    <div id="cookieConsent" class="alert alert-dark text-center mb-0" style="display: none;">
-        <div class="container">
-            <div class="d-flex flex-column flex-md-row align-items-center justify-content-between">
-                <div class="mb-2 mb-md-0 text-start">
-                    We use cookies to enhance your experience. By continuing to browse, you agree to our use of cookies.
-                    <a href="{{ url_for('privacy_policy') }}" class="text-white ms-1">Learn more</a>
-                </div>
-                <div class="d-flex">
-                    <a href="{{ url_for('cookie_preferences') }}" class="btn btn-outline-light btn-sm me-2">
-                        Preferences
-                    </a>
-                    
-                    <button type="button" class="btn btn-primary btn-sm" id="acceptCookies">
-                        Accept All
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     
-    <!-- Image Cache Busting Script -->
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            // Image cache busting for product images
-            function bustImageCache() {
-                const images = document.querySelectorAll('img[src*="uploads"], img.product-image');
-                const timestamp = new Date().getTime();
-                
-                images.forEach(img => {
-                    const src = img.src;
-                    if (src.includes('uploads')) {
-                        // Add timestamp to force reload
-                        if (!src.includes('?')) {
-                            img.src = src + '?t=' + timestamp;
-                        } else if (!src.includes('t=')) {
-                            img.src = src + '&t=' + timestamp;
-                        }
+        // Simple image error handling
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add error handlers to all images
+            document.querySelectorAll('img').forEach(img => {
+                img.addEventListener('error', function() {
+                    if (!this.src.includes('placeholder.svg')) {
+                        this.src = '{{ url_for("static", filename="images/placeholder.svg") }}?v=1';
                     }
                 });
-            }
-            
-            // Bust cache on page load and after login/logout
-            bustImageCache();
-            
-            // Check if cookie consent is needed
-            if (!localStorage.getItem('cookieConsent') && !document.cookie.includes('cookie_preferences')) {
-                document.getElementById('cookieConsent').style.display = 'block';
-            }
-            
-            // Accept cookies handler
-            document.getElementById('acceptCookies')?.addEventListener('click', function() {
-                localStorage.setItem('cookieConsent', 'true');
-                document.cookie = "cookie_preferences=analytics:on|functional:on; path=/; max-age=31536000; samesite=Lax";
-                document.getElementById('cookieConsent').style.display = 'none';
-                
-                // Load analytics if accepted
-                if (typeof loadAnalytics === 'function') {
-                    loadAnalytics();
-                }
             });
-            
-            // Check cookie preferences
-            const cookiePrefs = getCookie('cookie_preferences');
-            if (cookiePrefs && typeof initCookies === 'function') {
-                initCookies(cookiePrefs);
-            }
-            
-            // Session keep-alive to prevent image issues
-            setInterval(() => {
-                fetch('{{ url_for("keepalive") }}', {
-                    method: 'POST',
-                    credentials: 'include'
-                }).catch(() => {});
-            }, 300000); // 5 minutes
         });
-
-        function getCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
-        }
-        
-        // Global function to reload product images
-        function reloadProductImages() {
-            const images = document.querySelectorAll('.product-image, img[src*="uploads"]');
-            const timestamp = new Date().getTime();
-            
-            images.forEach(img => {
-                const originalSrc = img.src.split('?')[0];
-                img.src = originalSrc + '?t=' + timestamp;
-            });
-        }
     </script>
     {% block scripts %}{% endblock %}
 </body>

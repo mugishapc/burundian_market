@@ -415,37 +415,37 @@ def startup_tasks():
         check_all_subscriptions()
         startup_done = True
 
-# NEW: Enhanced static file serving for uploaded images
+# CRITICAL FIX: Enhanced static file serving for uploaded images
 @app.route('/uploads/<path:filename>')
 def serve_uploaded_files(filename):
     """Serve uploaded files with proper caching and security"""
     try:
-        response = send_from_directory(
-            os.path.join(app.root_path, 'static', 'uploads'),
-            filename,
-            as_attachment=False
-        )
-        # Set proper caching headers
+        # Ensure the uploads directory exists
+        uploads_dir = os.path.join(app.root_path, 'static', 'uploads')
+        if not os.path.exists(uploads_dir):
+            os.makedirs(uploads_dir)
+            
+        response = send_from_directory(uploads_dir, filename)
+        # Set proper caching headers - ALLOW CACHING for images
         response.headers['Cache-Control'] = 'public, max-age=3600'  # 1 hour cache
+        response.headers['Pragma'] = 'cache'
         return response
     except FileNotFoundError:
-        abort(404)
+        # Return a placeholder image if file not found
+        return send_from_directory(os.path.join(app.root_path, 'static'), 'images/placeholder.svg')
 
-# NEW: Function to get absolute image URL
+# NEW: Function to get absolute image URL with cache busting
 def get_image_url(image_path):
-    """Get absolute URL for product images"""
+    """Get absolute URL for product images with cache busting"""
     if not image_path:
-        return url_for('static', filename='images/placeholder.jpg')
+        return url_for('static', filename='images/placeholder.svg') + '?v=1'
     
-    # If it's already a full URL, return as is
-    if image_path.startswith(('http://', 'https://')):
-        return image_path
-    
-    # If it's a relative path, make it absolute
+    # If it's a relative path, serve via our uploads route
     if image_path.startswith('uploads/'):
-        return url_for('serve_uploaded_files', filename=image_path.replace('uploads/', ''))
+        filename = image_path.replace('uploads/', '')
+        return url_for('serve_uploaded_files', filename=filename) + '?t=' + str(int(time.time()))
     
-    return url_for('static', filename=image_path)
+    return url_for('static', filename=image_path) + '?t=' + str(int(time.time()))
 
 # Routes
 @app.route('/')
@@ -454,7 +454,7 @@ def home():
         User.is_seller_active == True
     ).order_by(Product.created_at.desc()).limit(8).all()
     
-    # Ensure proper image URLs
+    # Ensure proper image URLs with cache busting
     for product in products:
         product.image_url = get_image_url(product.image)
     
@@ -853,13 +853,29 @@ def product_detail(product_id):
     product = db.session.query(Product).get_or_404(product_id)
     seller = db.session.query(User).get(product.seller_id)
     
-    # Ensure proper image URL
+    # Ensure proper image URL with cache busting
     product.image_url = get_image_url(product.image)
     
     # Check if the current user is the seller
     is_seller = 'user_id' in session and session['user_id'] == product.seller_id
     
-    return render_template('product_detail.html', product=product, seller=seller, is_seller=is_seller)
+    # Get similar products
+    similar_products = Product.query.filter(
+        Product.category == product.category,
+        Product.id != product.id,
+        Product.seller_id == User.id,
+        User.is_seller_active == True
+    ).limit(4).all()
+    
+    # Ensure proper image URLs for similar products
+    for similar in similar_products:
+        similar.image_url = get_image_url(similar.image)
+    
+    return render_template('product_detail.html', 
+                         product=product, 
+                         seller=seller, 
+                         is_seller=is_seller,
+                         similar_products=similar_products)
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
@@ -1201,7 +1217,7 @@ def admin_send_message(user_id):
             flash('Message sent successfully!', 'success')
             return redirect(url_for('admin_view_user', user_id=user_id))
         except Exception as e:
-            app.logger.error(f"Error sending message to {user.email}: {str(e)}")
+            print(f"Error sending message to {user.email}: {str(e)}")
             flash('Failed to send message. Please try again.', 'danger')
     
     return render_template('admin_send_message.html', user=user)
@@ -1332,15 +1348,24 @@ def cookie_preferences():
     
     return render_template('cookie_preferences.html', preferences=preferences)
 
+# FIXED: Keepalive endpoint without CSRF protection
 @app.route('/keepalive', methods=['POST'])
+@csrf.exempt  # Exempt from CSRF protection
 def keepalive():
-    if 'user_id' in session:
-        user = db.session.query(User).get(session['user_id'])
-        if user:
-            user.last_activity = datetime.utcnow()
-            db.session.commit()
-            return {'status': 'active'}, 200
-    return {'status': 'inactive'}, 401
+    """Enhanced keepalive endpoint that handles session refresh properly"""
+    try:
+        if 'user_id' in session:
+            user = db.session.query(User).get(session['user_id'])
+            if user:
+                user.last_activity = datetime.utcnow()
+                db.session.commit()
+                # Refresh the session to extend its lifetime
+                session.modified = True
+                return jsonify({'status': 'active', 'user_id': user.id}), 200
+        return jsonify({'status': 'inactive'}), 200
+    except Exception as e:
+        print(f"Keepalive error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/checksession')
 def check_session():
@@ -1354,31 +1379,24 @@ def check_session():
 def terms():
     return render_template('terms.html', now=datetime.now())
 
-# NEW: Add a route to clear image cache (for debugging)
-@app.route('/clear-image-cache')
-def clear_image_cache():
-    """Debug route to clear image cache issues"""
-    if 'user_id' not in session or session.get('user_type') != 'admin':
-        abort(403)
+# NEW: Debug route to check image paths
+@app.route('/debug-images')
+def debug_images():
+    """Debug route to check image paths"""
+    products = Product.query.limit(5).all()
+    debug_info = []
     
-    # This forces browsers to reload images
-    return '''
-    <script>
-        // Clear browser cache for images
-        if (caches) {
-            caches.keys().then(function(names) {
-                for (let name of names)
-                    caches.delete(name);
-            });
-        }
-        // Force reload images
-        document.querySelectorAll('img').forEach(img => {
-            img.src = img.src + '?t=' + new Date().getTime();
-        });
-        alert('Image cache cleared!');
-        window.history.back();
-    </script>
-    '''
+    for product in products:
+        debug_info.append({
+            'id': product.id,
+            'title': product.title,
+            'image_path': product.image,
+            'static_url': url_for('static', filename=product.image) if product.image else None,
+            'uploads_url': url_for('serve_uploaded_files', filename=product.image.replace('uploads/', '')) if product.image and product.image.startswith('uploads/') else None,
+            'file_exists': os.path.exists(os.path.join(app.root_path, 'static', product.image)) if product.image else False
+        })
+    
+    return jsonify(debug_info)
 
 if __name__ == '__main__':
     app.run(debug=True)

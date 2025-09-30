@@ -1,27 +1,115 @@
 {% extends "base.html" %}
+{% block title %}Reset Link Generated{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header">
-                    <h4>Password Reset Link Generated</h4>
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Password Reset Link Generated
+                    </h4>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info">
-                        <strong>For user:</strong> {{ email }}
+                        <h5 class="alert-heading">
+                            <i class="fas fa-user me-2"></i>For User: {{ email }}
+                        </h5>
+                        <p class="mb-0">
+                            A password reset link has been generated successfully. Share this link with the user.
+                        </p>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label"><strong>Reset Link:</strong></label>
-                        <input type="text" class="form-control" value="{{ reset_url }}" readonly>
+                    
+                    <div class="mb-4">
+                        <label for="resetLink" class="form-label fw-bold">Password Reset Link:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="resetLink" 
+                                   value="{{ reset_url }}" readonly style="font-family: monospace;">
+                            <button class="btn btn-outline-primary" type="button" 
+                                    onclick="copyResetLink()">
+                                <i class="fas fa-copy me-2"></i>Copy
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <i class="fas fa-clock me-1"></i> This link expires in 1 hour.
+                        </div>
                     </div>
-                    <p class="text-muted">Share this link with the user. It will expire in 1 hour.</p>
-                    <a href="{{ url_for('admin_manual_reset') }}" class="btn btn-primary">Generate Another</a>
-                    <a href="{{ url_for('login') }}" class="btn btn-secondary">Back to Login</a>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Security Notes</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="small mb-0">
+                                        <li>Share this link securely with the user</li>
+                                        <li>Do not share via unencrypted channels</li>
+                                        <li>The link is one-time use only</li>
+                                        <li>Expires after 1 hour</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Next Steps</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="small mb-0">
+                                        <li>User clicks the link</li>
+                                        <li>User sets new password</li>
+                                        <li>User can then login normally</li>
+                                        <li>Link becomes invalid after use</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-4">
+                        <a href="{{ reset_url }}" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-external-link-alt me-2"></i>Test Reset Link
+                        </a>
+                        <a href="{{ url_for('admin_manual_reset') }}" class="btn btn-warning">
+                            <i class="fas fa-redo me-2"></i>Generate Another
+                        </a>
+                        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-home me-2"></i>Dashboard
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function copyResetLink() {
+    const resetLink = document.getElementById('resetLink');
+    resetLink.select();
+    resetLink.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(resetLink.value).then(function() {
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+        button.classList.remove('btn-outline-primary');
+        button.classList.add('btn-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+
+// Auto-select the reset link when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('resetLink').select();
+});
+</script>
 {% endblock %}

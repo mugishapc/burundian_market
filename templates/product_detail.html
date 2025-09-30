@@ -4,19 +4,19 @@
 {% block content %}
 <div class="row">
     <div class="col-md-6">
-        {% if product.image %}
-            <img src="{{ url_for('static', filename=product.image) }}?t={{ range(1, 100000) | random }}" 
-                 class="img-fluid rounded product-img" 
+        {% if product.image_url %}
+            <img src="{{ product.image_url }}" 
+                 class="img-fluid rounded" 
                  alt="{{ product.title }}"
                  style="max-height: 500px; object-fit: contain;"
-                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
+                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}?v=1';">
         {% else %}
             <div class="bg-secondary d-flex align-items-center justify-content-center rounded" 
                  style="height: 300px; width: 100%;">
-                <span class="text-white">
-                    <i class="fas fa-image fa-2x me-2"></i>
-                    No Image Available
-                </span>
+                <div class="text-center text-white">
+                    <i class="fas fa-image fa-3x mb-3"></i>
+                    <p class="mb-0">No Image Available</p>
+                </div>
             </div>
         {% endif %}
     </div>
@@ -80,15 +80,15 @@
         <div class="col-md-3 mb-4">
             <div class="card h-100">
                 <a href="{{ url_for('product_detail', product_id=similar.id) }}">
-                    {% if similar.image %}
-                    <img src="{{ url_for('static', filename=similar.image) }}?t={{ range(1, 100000) | random }}" 
-                         class="card-img-top product-img" 
+                    {% if similar.image_url %}
+                    <img src="{{ similar.image_url }}" 
+                         class="card-img-top" 
                          alt="{{ similar.title }}"
                          style="height: 200px; object-fit: cover;"
-                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
+                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}?v=1';">
                     {% else %}
                     <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="height: 200px;">
-                        <i class="fas fa-image text-white"></i>
+                        <i class="fas fa-image text-white fa-2x"></i>
                     </div>
                     {% endif %}
                 </a>
@@ -108,22 +108,13 @@
 {% endif %}
 
 <script>
-    // Force image reload for this page
+    // Force reload main image
     document.addEventListener('DOMContentLoaded', function() {
         const mainImage = document.querySelector('.img-fluid.rounded');
         if (mainImage && mainImage.src) {
             const originalSrc = mainImage.src.split('?')[0];
-            mainImage.src = originalSrc + '?t=' + new Date().getTime();
+            mainImage.src = originalSrc + '?force=' + new Date().getTime();
         }
-        
-        // Reload similar product images
-        const similarImages = document.querySelectorAll('.card-img-top.product-img');
-        similarImages.forEach(img => {
-            if (img.src) {
-                const originalSrc = img.src.split('?')[0];
-                img.src = originalSrc + '?t=' + new Date().getTime();
-            }
-        });
     });
 </script>
 {% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Send Message to {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-envelope me-2"></i>
+                        Send Message to {{ user.username }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="user-info mb-4 p-3 bg-light rounded">
+                        <h5>User Information</h5>
+                        <p class="mb-1"><strong>Username:</strong> {{ user.username }}</p>
+                        <p class="mb-1"><strong>Email:</strong> {{ user.email }}</p>
+                        <p class="mb-1"><strong>User Type:</strong> <span class="badge bg-info">{{ user.user_type }}</span></p>
+                        <p class="mb-0"><strong>Registered:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
+                    </div>
+
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Subject</label>
+                            <input type="text" class="form-control" id="subject" name="subject" 
+                                   value="Message from Burundian Market Admin" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="message" class="form-label">Message</label>
+                            <textarea class="form-control" id="message" name="message" rows="8" 
+                                      placeholder="Type your message here..." required></textarea>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-2"></i> Send Message
+                            </button>
+                            <a href="{{ url_for('admin_view_user', user_id=user.id) }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i> Back to User
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Important Notes</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Messages are sent via email to the user's registered email address</li>
+                        <li>Users will receive your message in their inbox</li>
+                        <li>Keep messages professional and clear</li>
+                        <li>Double-check the content before sending</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

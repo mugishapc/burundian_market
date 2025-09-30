@@ -1,27 +1,89 @@
 {% extends "base.html" %}
+{% block title %}Password Reset Link{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header">
-                    <h4>Password Reset Link</h4>
+                <div class="card-header bg-warning">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Email Service Temporarily Unavailable
+                    </h4>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-warning">
-                        <strong>Note:</strong> Email service is temporarily unavailable. Please use the link below to reset your password.
+                    <div class="alert alert-info">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-info-circle me-2"></i>Manual Password Reset Required
+                        </h5>
+                        <p class="mb-0">
+                            Our email service is currently experiencing issues. Please use the link below to reset your password.
+                        </p>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label"><strong>Reset Link:</strong></label>
-                        <input type="text" class="form-control" value="{{ reset_url }}" readonly>
-                        <small class="form-text text-muted">This link will expire in 1 hour.</small>
+                    
+                    <div class="mb-4">
+                        <label for="resetLink" class="form-label fw-bold">Password Reset Link:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="resetLink" 
+                                   value="{{ reset_url }}" readonly>
+                            <button class="btn btn-outline-primary" type="button" 
+                                    onclick="copyResetLink()">
+                                <i class="fas fa-copy me-2"></i>Copy
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            This link will expire in 1 hour. Please click it to reset your password.
+                        </div>
                     </div>
-                    <a href="{{ reset_url }}" class="btn btn-primary" target="_blank">Reset Password</a>
-                    <a href="{{ url_for('login') }}" class="btn btn-secondary">Back to Login</a>
+                    
+                    <div class="d-flex gap-2">
+                        <a href="{{ reset_url }}" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-external-link-alt me-2"></i>Open Reset Link
+                        </a>
+                        <a href="{{ url_for('login') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Login
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>Need Help?</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">If you're having trouble with the reset link:</p>
+                    <ul class="mb-0">
+                        <li>Make sure to copy the entire link</li>
+                        <li>Paste it into your browser's address bar</li>
+                        <li>The link is case-sensitive</li>
+                        <li>If the link expires, you'll need to request a new one</li>
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function copyResetLink() {
+    const resetLink = document.getElementById('resetLink');
+    resetLink.select();
+    resetLink.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(resetLink.value).then(function() {
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+        button.classList.remove('btn-outline-primary');
+        button.classList.add('btn-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+</script>
 {% endblock %}

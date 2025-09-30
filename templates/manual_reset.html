@@ -1,23 +1,58 @@
 {% extends "base.html" %}
+{% block title %}Manual Password Reset{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container">
     <div class="row justify-content-center">
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header">
-                    <h4>Manual Password Reset</h4>
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-tools me-2"></i>
+                        Manual Password Reset (Admin Only)
+                    </h4>
                 </div>
                 <div class="card-body">
-                    <p class="text-warning">Use this only when email system is down</p>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Admin Access Required:</strong> This feature is for administrators only when email service is down.
+                    </div>
+                    
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
-                            <label for="email" class="form-label">User Email</label>
-                            <input type="email" class="form-control" id="email" name="email" required>
+                            <label for="email" class="form-label">User Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   placeholder="Enter user's email address" required>
+                            <div class="form-text">
+                                Enter the email address of the user who needs a password reset.
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Generate Reset Link</button>
-                        <a href="{{ url_for('login') }}" class="btn btn-secondary">Back to Login</a>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-key me-2"></i> Generate Reset Link
+                            </button>
+                            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+                            </a>
+                        </div>
                     </form>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Instructions</h5>
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0">
+                        <li>Enter the user's email address</li>
+                        <li>Click "Generate Reset Link"</li>
+                        <li>Copy the generated reset link</li>
+                        <li>Share the link with the user securely</li>
+                        <li>The link will be valid for 1 hour</li>
+                    </ol>
                 </div>
             </div>
         </div>
