@@ -1,9 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, make_response, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import datetime
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, text
 from flask_wtf.csrf import CSRFProtect
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Mail, Message
@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import threading
 import time
 import smtplib
+import urllib.parse
 
 # Load environment variables first
 load_dotenv()
@@ -83,9 +84,34 @@ class User(db.Model):
     last_active = db.Column(db.DateTime, default=db.func.current_timestamp(), 
                            onupdate=db.func.current_timestamp())
     
+    # New field for subscription notifications
+    last_notification_sent = db.Column(db.DateTime, nullable=True)
+    
     def is_active(self):
         """Check if user session should still be valid"""
         return datetime.now() - self.last_active < timedelta(hours=1)
+
+    def get_subscription_status(self):
+        """Get subscription status with days left"""
+        if not self.subscription_end:
+            if self.is_seller_active:
+                # Trial period
+                trial_end = self.created_at + timedelta(days=5)
+                days_left = (trial_end - datetime.now()).days
+                return {
+                    'status': 'trial',
+                    'days_left': max(0, days_left),
+                    'active': days_left > 0
+                }
+            else:
+                return {'status': 'inactive', 'days_left': 0, 'active': False}
+        else:
+            days_left = (self.subscription_end - datetime.now()).days
+            return {
+                'status': 'subscription',
+                'days_left': max(0, days_left),
+                'active': days_left > 0 and self.is_seller_active
+            }
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -107,40 +133,76 @@ class Product(db.Model):
     def __repr__(self):
         return f'<Product {self.title}>'
 
-# DIRECT DATABASE INITIALIZATION - NO MIGRATIONS!
+# IMPROVED DATABASE INITIALIZATION - Handles schema updates
 def initialize_database():
-    """Initialize database tables directly"""
+    """Initialize database tables and handle schema updates"""
     with app.app_context():
         try:
             print("🚀 Initializing database...")
             
-            # Drop alembic_version table if it exists
-            try:
-                db.engine.execute('DROP TABLE IF EXISTS alembic_version')
-                print("✅ Removed alembic_version table")
-            except Exception as e:
-                print(f"ℹ️  No alembic_version table to remove: {e}")
+            # Check if tables exist and handle schema updates
+            inspector = db.inspect(db.engine)
+            existing_tables = inspector.get_table_names()
             
-            # Create all tables
-            db.create_all()
-            print("✅ Created all tables")
-            
-            # Create admin user if not exists
-            from werkzeug.security import generate_password_hash
-            if not User.query.filter_by(email='mpc0679@gmail.com').first():
-                admin = User(
-                    username='TEAM MANAGEMENT',
-                    email='mpc0679@gmail.com',
-                    password=generate_password_hash('61Mpc588214#'),
-                    user_type='admin',
-                    is_verified=True,
-                    email_verified=True
-                )
-                db.session.add(admin)
-                db.session.commit()
-                print("✅ Admin user created")
+            if 'users' in existing_tables:
+                print("ℹ️  Tables already exist, checking for schema updates...")
+                
+                # Check if last_notification_sent column exists
+                users_columns = [col['name'] for col in inspector.get_columns('users')]
+                
+                if 'last_notification_sent' not in users_columns:
+                    print("🔄 Adding missing column: last_notification_sent")
+                    try:
+                        # Add the missing column using raw SQL
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE users ADD COLUMN last_notification_sent TIMESTAMP'))
+                            conn.commit()
+                        print("✅ Added last_notification_sent column")
+                    except Exception as e:
+                        print(f"⚠️  Could not add column: {e}")
+                        # Continue anyway - the app will work without the new column
+                
+                # Create admin user if not exists - using safer approach
+                try:
+                    admin_user = db.session.query(User).filter_by(email='mpc0679@gmail.com').first()
+                    if not admin_user:
+                        admin = User(
+                            username='TEAM MANAGEMENT',
+                            email='mpc0679@gmail.com',
+                            password=generate_password_hash('61Mpc588214#'),
+                            user_type='admin',
+                            is_verified=True,
+                            email_verified=True
+                        )
+                        db.session.add(admin)
+                        db.session.commit()
+                        print("✅ Admin user created")
+                    else:
+                        print("✅ Admin user already exists")
+                except Exception as e:
+                    print(f"⚠️  Could not create/administer admin user: {e}")
+                
             else:
-                print("✅ Admin user already exists")
+                # Create all tables if they don't exist
+                print("🆕 Creating all tables...")
+                db.create_all()
+                print("✅ Created all tables")
+                
+                # Create admin user
+                try:
+                    admin = User(
+                        username='TEAM MANAGEMENT',
+                        email='mpc0679@gmail.com',
+                        password=generate_password_hash('61Mpc588214#'),
+                        user_type='admin',
+                        is_verified=True,
+                        email_verified=True
+                    )
+                    db.session.add(admin)
+                    db.session.commit()
+                    print("✅ Admin user created")
+                except Exception as e:
+                    print(f"⚠️  Could not create admin user: {e}")
             
             print("🎉 Database initialized successfully!")
             
@@ -148,6 +210,7 @@ def initialize_database():
             print(f"❌ Database initialization error: {e}")
             import traceback
             traceback.print_exc()
+            # Don't exit - let the app continue running
 
 # Initialize database when app starts
 initialize_database()
@@ -217,19 +280,191 @@ def send_notification_email(recipient, subject, body):
     msg = Message(subject, recipients=[recipient], body=body)
     send_async_email(app, msg)
 
+# Subscription Notification System
+def notify_subscription_status(user, notification_type):
+    """Notify user about subscription status with multiple fallback methods"""
+    try:
+        status = user.get_subscription_status()
+        
+        # Prevent spam - don't send same notification more than once per day
+        if hasattr(user, 'last_notification_sent') and user.last_notification_sent and (datetime.now() - user.last_notification_sent).days < 1:
+            return
+        
+        if notification_type == 'trial_ending':
+            message = f'''
+Hello {user.username},
+
+Your 5-day trial period ends in {status['days_left']} days. 
+To continue selling on Burundian Market, please subscribe to one of our plans.
+
+Visit: https://burundian-market-e8vg.onrender.com/seller/subscribe
+
+Thank you for using our service!
+'''
+            subject = 'Trial Period Ending Soon'
+            
+        elif notification_type == 'subscription_ending':
+            message = f'''
+Hello {user.username},
+
+Your subscription will end in {status['days_left']} days.
+Please renew your subscription to avoid service interruption.
+
+Visit: https://burundian-market-e8vg.onrender.com/seller/subscribe
+
+Thank you for using Burundian Market!
+'''
+            subject = 'Subscription Ending Soon'
+            
+        elif notification_type == 'trial_ended':
+            message = f'''
+Hello {user.username},
+
+Your 5-day trial period has ended.
+Your seller account has been deactivated. To reactivate and continue selling, please subscribe.
+
+Visit: https://burundian-market-e8vg.onrender.com/seller/subscribe
+
+Thank you for using Burundian Market!
+'''
+            subject = 'Trial Period Ended'
+            
+        elif notification_type == 'subscription_ended':
+            message = f'''
+Hello {user.username},
+
+Your subscription has ended.
+Your seller account has been deactivated. To reactivate and continue selling, please renew your subscription.
+
+Visit: https://burundian-market-e8vg.onrender.com/seller/subscribe
+
+Thank you for using Burundian Market!
+'''
+            subject = 'Subscription Ended'
+        
+        # Method 1: Try email (but don't block if it fails)
+        try:
+            send_notification_email(user.email, subject, message)
+            print(f"✅ Email notification sent to {user.email}")
+        except Exception as e:
+            print(f"❌ Email notification failed for {user.email}: {e}")
+        
+        # Method 2: Log to console (always works)
+        print(f"📢 SUBSCRIPTION NOTIFICATION for {user.username} ({user.email}):")
+        print(f"📢 Type: {notification_type}")
+        print(f"📢 Status: {status}")
+        print(f"📢 Message: {message.strip()}")
+        print("---")
+        
+        # Method 3: Store notification in database for dashboard display (if column exists)
+        try:
+            if hasattr(user, 'last_notification_sent'):
+                user.last_notification_sent = datetime.now()
+                db.session.commit()
+        except Exception as e:
+            print(f"⚠️ Could not update last_notification_sent: {e}")
+            
+    except Exception as e:
+        print(f"❌ Error in notify_subscription_status: {e}")
+
+# Background task to check all seller subscriptions
+def check_all_subscriptions():
+    """Background task to check all seller subscriptions"""
+    with app.app_context():
+        try:
+            sellers = db.session.query(User).filter_by(user_type='seller').all()
+            for seller in sellers:
+                try:
+                    status = seller.get_subscription_status()
+                    
+                    # Notify if trial ending in 2 days
+                    if status['status'] == 'trial' and status['days_left'] == 2:
+                        notify_subscription_status(seller, 'trial_ending')
+                    
+                    # Notify if subscription ending in 3 days
+                    elif status['status'] == 'subscription' and status['days_left'] == 3:
+                        notify_subscription_status(seller, 'subscription_ending')
+                    
+                    # Deactivate if trial ended
+                    elif status['status'] == 'trial' and status['days_left'] <= 0 and seller.is_seller_active:
+                        seller.is_seller_active = False
+                        db.session.commit()
+                        notify_subscription_status(seller, 'trial_ended')
+                    
+                    # Deactivate if subscription ended
+                    elif status['status'] == 'subscription' and status['days_left'] <= 0 and seller.is_seller_active:
+                        seller.is_seller_active = False
+                        db.session.commit()
+                        notify_subscription_status(seller, 'subscription_ended')
+                        
+                except Exception as e:
+                    print(f"⚠️ Error processing seller {seller.id}: {e}")
+                    continue
+                    
+        except Exception as e:
+            print(f"Error in subscription check: {e}")
+
+# FIXED: Use modern Flask startup method
+startup_done = False
+
+@app.before_request
+def startup_tasks():
+    """Run startup tasks on first request"""
+    global startup_done
+    if not startup_done:
+        check_all_subscriptions()
+        startup_done = True
+
+# NEW: Enhanced static file serving for uploaded images
+@app.route('/uploads/<path:filename>')
+def serve_uploaded_files(filename):
+    """Serve uploaded files with proper caching and security"""
+    try:
+        response = send_from_directory(
+            os.path.join(app.root_path, 'static', 'uploads'),
+            filename,
+            as_attachment=False
+        )
+        # Set proper caching headers
+        response.headers['Cache-Control'] = 'public, max-age=3600'  # 1 hour cache
+        return response
+    except FileNotFoundError:
+        abort(404)
+
+# NEW: Function to get absolute image URL
+def get_image_url(image_path):
+    """Get absolute URL for product images"""
+    if not image_path:
+        return url_for('static', filename='images/placeholder.jpg')
+    
+    # If it's already a full URL, return as is
+    if image_path.startswith(('http://', 'https://')):
+        return image_path
+    
+    # If it's a relative path, make it absolute
+    if image_path.startswith('uploads/'):
+        return url_for('serve_uploaded_files', filename=image_path.replace('uploads/', ''))
+    
+    return url_for('static', filename=image_path)
+
 # Routes
 @app.route('/')
 def home():
     products = Product.query.join(User).filter(
         User.is_seller_active == True
     ).order_by(Product.created_at.desc()).limit(8).all()
+    
+    # Ensure proper image URLs
+    for product in products:
+        product.image_url = get_image_url(product.image)
+    
     return render_template('index.html', products=products)
 
 @app.route('/test-db')
 def test_db():
     try:
-        users_count = User.query.count()
-        products_count = Product.query.count()
+        users_count = db.session.query(User).count()
+        products_count = db.session.query(Product).count()
         
         return jsonify({
             'status': 'success',
@@ -267,7 +502,7 @@ def refresh_session():
         session.modified = True
         
         # Check if user still exists
-        user = User.query.get(session['user_id'])
+        user = db.session.query(User).get(session['user_id'])
         if not user:
             session.clear()
             return redirect(url_for('login'))
@@ -315,6 +550,10 @@ def product_search():
         per_page=per_page,
         error_out=False
     )
+    
+    # Ensure proper image URLs for all products
+    for product in products.items:
+        product.image_url = get_image_url(product.image)
 
     return render_template(
         'product_search.html',
@@ -323,6 +562,95 @@ def product_search():
         categories=categories,
         selected_category=None  # No category selected when doing general search
     )
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        identifier = request.form.get('identifier', '').strip()
+        password = request.form.get('password', '').strip()
+        remember = 'remember' in request.form  # Check if "remember me" was checked
+
+        if not identifier or not password:
+            flash('Please enter both email/username and password', 'danger')
+            return redirect(url_for('login'))
+
+        # FIXED QUERY: Use db.session.query() consistently
+        user = db.session.query(User).filter(
+            (func.lower(User.email) == func.lower(identifier)) | 
+            (func.lower(User.username) == func.lower(identifier))
+        ).first()
+
+        if not user:
+            flash('No account found with this email or username', 'danger')
+            return redirect(url_for('login'))
+
+        if not check_password_hash(user.password, password):
+            flash('Invalid password', 'danger')
+            return redirect(url_for('login'))
+
+        if not user.email_verified:
+            flash('Please verify your email before logging in', 'warning')
+            return redirect(url_for('login'))
+
+        # Clear and create new session
+        session.clear()
+        session.permanent = True  # Make the session persistent
+        session['user_id'] = user.id
+        session['user_type'] = user.user_type
+        session['username'] = user.username
+        session['_fresh'] = True
+        session.modified = True
+
+        # Update last login time
+        user.last_login = datetime.now()
+        db.session.commit()
+
+        # Check and notify about subscription status on login
+        if user.user_type == 'seller':
+            status = user.get_subscription_status()
+            if not status['active']:
+                if status['status'] == 'trial':
+                    notify_subscription_status(user, 'trial_ended')
+                    flash('Your trial period has ended. Please subscribe to continue selling.', 'warning')
+                else:
+                    notify_subscription_status(user, 'subscription_ended')
+                    flash('Your subscription has ended. Please renew to continue selling.', 'warning')
+            elif status['days_left'] <= 3:
+                if status['status'] == 'trial':
+                    notify_subscription_status(user, 'trial_ending')
+                    flash(f'Your trial ends in {status["days_left"]} days. Please subscribe soon!', 'info')
+                else:
+                    notify_subscription_status(user, 'subscription_ending')
+                    flash(f'Your subscription ends in {status["days_left"]} days. Please renew soon!', 'info')
+
+        flash('Login successful!', 'success')
+        
+        # Create response and set remember cookie if "remember me" was checked
+        response = make_response(redirect(url_for(
+            'admin_dashboard' if user.user_type == 'admin' else
+            'seller_dashboard' if user.user_type == 'seller' else
+            'buyer_dashboard'
+        )))
+        
+        if remember:
+            # Create a remember token and store it in the database
+            remember_token = serializer.dumps(user.id, salt='remember-me')
+            user.remember_token = remember_token
+            db.session.commit()
+            
+            # Set the cookie
+            response.set_cookie(
+                'remember_token',
+                value=remember_token,
+                expires=datetime.now() + timedelta(days=30),
+                httponly=True,
+                secure=app.config['SESSION_COOKIE_SECURE'],
+                samesite='Lax'
+            )
+        
+        return response
+
+    return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -333,8 +661,9 @@ def register():
         phone = request.form.get('phone')
         user_type = request.form['user_type']
         
-        # Only check for username (email check removed)
-        if User.query.filter_by(username=username).first():
+        # Only check for username (email check removed) - FIXED QUERY
+        existing_user = db.session.query(User).filter_by(username=username).first()
+        if existing_user:
             flash('Username already exists', 'danger')
             return redirect(url_for('register'))
         
@@ -377,7 +706,7 @@ def verify_email(token):
         flash('The verification link is invalid or has expired.', 'danger')
         return redirect(url_for('register'))
     
-    user = User.query.filter_by(email=email).first_or_404()
+    user = db.session.query(User).filter_by(email=email).first_or_404()
     
     if user.email_verified:
         flash('Account already verified. Please login.', 'info')
@@ -390,75 +719,7 @@ def verify_email(token):
     
     return redirect(url_for('login'))
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        identifier = request.form.get('identifier', '').strip()
-        password = request.form.get('password', '').strip()
-        remember = 'remember' in request.form  # Check if "remember me" was checked
 
-        if not identifier or not password:
-            flash('Please enter both email/username and password', 'danger')
-            return redirect(url_for('login'))
-
-        user = db.session.query(User).filter(
-            (func.lower(User.email) == func.lower(identifier)) | 
-            (func.lower(User.username) == func.lower(identifier))
-        ).first()
-
-        if not user:
-            flash('No account found with this email or username', 'danger')
-            return redirect(url_for('login'))
-
-        if not check_password_hash(user.password, password):
-            flash('Invalid password', 'danger')
-            return redirect(url_for('login'))
-
-        if not user.email_verified:
-            flash('Please verify your email before logging in', 'warning')
-            return redirect(url_for('login'))
-
-        # Clear and create new session
-        session.clear()
-        session.permanent = True  # Make the session persistent
-        session['user_id'] = user.id
-        session['user_type'] = user.user_type
-        session['username'] = user.username
-        session['_fresh'] = True
-        session.modified = True
-
-        # Update last login time
-        user.last_login = datetime.now()
-        db.session.commit()
-
-        flash('Login successful!', 'success')
-        
-        # Create response and set remember cookie if "remember me" was checked
-        response = make_response(redirect(url_for(
-            'admin_dashboard' if user.user_type == 'admin' else
-            'seller_dashboard' if user.user_type == 'seller' else
-            'buyer_dashboard'
-        )))
-        
-        if remember:
-            # Create a remember token and store it in the database
-            remember_token = serializer.dumps(user.id, salt='remember-me')
-            user.remember_token = remember_token
-            db.session.commit()
-            
-            # Set the cookie
-            response.set_cookie(
-                'remember_token',
-                value=remember_token,
-                expires=datetime.now() + timedelta(days=30),
-                httponly=True,
-                secure=app.config['SESSION_COOKIE_SECURE'],
-                samesite='Lax'
-            )
-        
-        return response
-
-    return render_template('login.html')
 
 @app.before_request
 def check_persistent_login():
@@ -467,7 +728,7 @@ def check_persistent_login():
         if remember_token:
             try:
                 user_id = serializer.loads(remember_token, salt='remember-me')
-                user = User.query.get(user_id)
+                user = db.session.query(User).get(user_id)
                 if user and user.remember_token == remember_token:
                     # Recreate the session
                     session.permanent = True
@@ -487,7 +748,7 @@ def check_persistent_login():
 @app.route('/logout')
 def logout():
     if 'user_id' in session:
-        user = User.query.get(session['user_id'])
+        user = db.session.query(User).get(session['user_id'])
         if user:
             user.remember_token = None
             db.session.commit()
@@ -495,6 +756,7 @@ def logout():
     session.clear()
     response = make_response(redirect(url_for('home')))
     response.delete_cookie('remember_token')
+    response.delete_cookie('session')
     flash('You have been logged out.', 'info')
     return response
 
@@ -503,9 +765,21 @@ def seller_dashboard():
     if 'user_id' not in session or session['user_type'] != 'seller':
         return redirect(url_for('login'))
     
-    user = User.query.get(session['user_id'])
+    user = db.session.query(User).get(session['user_id'])
     products = Product.query.filter_by(seller_id=user.id).order_by(Product.created_at.desc()).all()
-    return render_template('seller_dashboard.html', user=user, products=products)
+    
+    # Ensure proper image URLs
+    for product in products:
+        product.image_url = get_image_url(product.image)
+    
+    # Get subscription status for display
+    subscription_status = user.get_subscription_status()
+    
+    return render_template('seller_dashboard.html', 
+                         user=user, 
+                         products=products,
+                         subscription_status=subscription_status)  # Remove datetime parameter
+
 
 @app.route('/buyer/dashboard')
 def buyer_dashboard():
@@ -516,12 +790,24 @@ def buyer_dashboard():
     categories = [c[0] for c in categories if c[0]]
     
     products = Product.query.order_by(Product.created_at.desc()).all()
+    
+    # Ensure proper image URLs
+    for product in products:
+        product.image_url = get_image_url(product.image)
+    
     return render_template('buyer_dashboard.html', products=products, categories=categories)
 
 @app.route('/product/add', methods=['GET', 'POST'])
 def add_product():
     if 'user_id' not in session or session['user_type'] != 'seller':
         return redirect(url_for('login'))
+    
+    user = db.session.query(User).get(session['user_id'])
+    
+    # Check if seller is active
+    if not user.is_seller_active:
+        flash('Your seller account is not active. Please subscribe to add products.', 'warning')
+        return redirect(url_for('seller_subscribe'))
     
     if request.method == 'POST':
         title = request.form['title']
@@ -540,7 +826,7 @@ def add_product():
                 os.makedirs(upload_folder)
             
             # Secure filename and save
-            filename = f"product_{session['user_id']}_{len(Product.query.all()) + 1}.jpg"
+            filename = f"product_{session['user_id']}_{int(time.time())}.jpg"
             image_path = os.path.join(upload_folder, filename)
             image.save(image_path)
             image_url = f"uploads/{filename}"
@@ -564,8 +850,11 @@ def add_product():
 
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
-    product = Product.query.get_or_404(product_id)
-    seller = User.query.get(product.seller_id)
+    product = db.session.query(Product).get_or_404(product_id)
+    seller = db.session.query(User).get(product.seller_id)
+    
+    # Ensure proper image URL
+    product.image_url = get_image_url(product.image)
     
     # Check if the current user is the seller
     is_seller = 'user_id' in session and session['user_id'] == product.seller_id
@@ -576,7 +865,7 @@ def product_detail(product_id):
 def forgot_password():
     if request.method == 'POST':
         email = request.form['email']
-        user = User.query.filter_by(email=email).first()
+        user = db.session.query(User).filter_by(email=email).first()
         
         if user:
             token = serializer.dumps(email, salt='password-reset')
@@ -606,7 +895,7 @@ def reset_password(token):
         flash('The password reset link is invalid or has expired.', 'danger')
         return redirect(url_for('forgot_password'))
     
-    user = User.query.filter_by(email=email).first()
+    user = db.session.query(User).filter_by(email=email).first()
     if not user:
         flash('Invalid user.', 'danger')
         return redirect(url_for('forgot_password'))
@@ -635,7 +924,7 @@ def admin_manual_reset():
         
     if request.method == 'POST':
         email = request.form['email']
-        user = User.query.filter_by(email=email).first()
+        user = db.session.query(User).filter_by(email=email).first()
         
         if user:
             # Generate a simple reset token (valid for 1 hour)
@@ -654,12 +943,12 @@ def edit_profile():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
-    user = User.query.get(session['user_id'])
+    user = db.session.query(User).get(session['user_id'])
     
     if request.method == 'POST':
         # Check if username is already taken by another user
         new_username = request.form.get('username')
-        if new_username != user.username and User.query.filter_by(username=new_username).first():
+        if new_username != user.username and db.session.query(User).filter_by(username=new_username).first():
             flash('Username already taken', 'danger')
             return redirect(url_for('edit_profile'))
         
@@ -685,7 +974,7 @@ def delete_account():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
-    user = User.query.get(session['user_id'])
+    user = db.session.query(User).get(session['user_id'])
     
     # Delete all user's products first (if seller)
     if user.user_type == 'seller':
@@ -705,9 +994,14 @@ def edit_product(product_id):
     if 'user_id' not in session or session['user_type'] != 'seller':
         abort(403)  # Forbidden for buyers
     
-    product = Product.query.get_or_404(product_id)
+    product = db.session.query(Product).get_or_404(product_id)
     if product.seller_id != session['user_id']:
         abort(403)  # Forbidden for other sellers
+    
+    user = db.session.query(User).get(session['user_id'])
+    if not user.is_seller_active:
+        flash('Your seller account is not active. Please subscribe to edit products.', 'warning')
+        return redirect(url_for('seller_subscribe'))
     
     if request.method == 'POST':
         product.title = request.form['title']
@@ -719,7 +1013,7 @@ def edit_product(product_id):
         image = request.files.get('image')
         if image and image.filename != '':
             upload_folder = os.path.join(app.root_path, 'static', 'uploads')
-            filename = f"product_{session['user_id']}_{product_id}.jpg"
+            filename = f"product_{session['user_id']}_{product_id}_{int(time.time())}.jpg"
             image_path = os.path.join(upload_folder, filename)
             image.save(image_path)
             product.image = f"uploads/{filename}"
@@ -728,6 +1022,9 @@ def edit_product(product_id):
         flash('Product updated successfully!', 'success')
         return redirect(url_for('seller_dashboard'))
     
+    # Ensure proper image URL for editing
+    product.image_url = get_image_url(product.image)
+    
     return render_template('edit_product.html', product=product)
 
 @app.route('/product/delete/<int:product_id>', methods=['POST'])
@@ -735,14 +1032,16 @@ def delete_product(product_id):
     if 'user_id' not in session or session['user_type'] != 'seller':
         abort(403)  # Forbidden for buyers
     
-    product = Product.query.get_or_404(product_id)
+    product = db.session.query(Product).get_or_404(product_id)
     if product.seller_id != session['user_id']:
         abort(403)  # Forbidden for other sellers
     
     # Delete product image if exists
     if product.image:
         try:
-            os.remove(os.path.join(app.root_path, 'static', product.image))
+            image_path = os.path.join(app.root_path, 'static', product.image)
+            if os.path.exists(image_path):
+                os.remove(image_path)
         except:
             pass
     
@@ -758,19 +1057,17 @@ def admin_dashboard():
         abort(403)
     
     # Get all users with their subscription status
-    users = User.query.order_by(User.created_at.desc()).all()
+    users = db.session.query(User).order_by(User.created_at.desc()).all()
     
     # Process sellers' subscription status
     ending_soon = []
     for user in users:
         if user.user_type == 'seller':
-            if user.subscription_end:
-                days_left = (user.subscription_end - datetime.now()).days
-                user.days_left = days_left
-                if 0 < days_left <= 5:
-                    ending_soon.append(user)
-            else:
-                user.days_left = None
+            status = user.get_subscription_status()
+            # Store the status in the user object for template access
+            user.subscription_status = status
+            if 0 < status['days_left'] <= 5:
+                ending_soon.append(user)
     
     return render_template('admin_dashboard.html', 
                          users=users, 
@@ -782,22 +1079,21 @@ def admin_view_user(user_id):
     if 'user_id' not in session or session.get('user_type') != 'admin':
         abort(403)
     
-    user = User.query.get_or_404(user_id)
+    user = db.session.query(User).get_or_404(user_id)
     products = []
     images = []
     
     if user.user_type == 'seller':
         products = Product.query.filter_by(seller_id=user.id).all()
-        # Get all images from products
-        images = [product.image for product in products if product.image]
+        # Get all images from products with proper URLs
+        images = [get_image_url(product.image) for product in products if product.image]
+        
+        # Ensure proper image URLs for products
+        for product in products:
+            product.image_url = get_image_url(product.image)
         
         # Calculate subscription status
-        if user.subscription_end:
-            days_left = (user.subscription_end - datetime.now()).days
-            user.subscription_status = {
-                'days_left': days_left,
-                'active': days_left > 0 if days_left else False
-            }
+        user.subscription_status = user.get_subscription_status()
     
     return render_template('admin_user_detail.html', 
                          user=user, 
@@ -810,7 +1106,7 @@ def admin_delete_user(user_id):
     if 'user_id' not in session or session.get('user_type') != 'admin':
         abort(403)
     
-    user = User.query.get_or_404(user_id)
+    user = db.session.query(User).get_or_404(user_id)
     username = user.username
     
     try:
@@ -820,7 +1116,9 @@ def admin_delete_user(user_id):
             for product in user.products:
                 if product.image:
                     try:
-                        os.remove(os.path.join(app.root_path, 'static', product.image))
+                        image_path = os.path.join(app.root_path, 'static', product.image)
+                        if os.path.exists(image_path):
+                            os.remove(image_path)
                     except:
                         pass
             Product.query.filter_by(seller_id=user.id).delete()
@@ -840,7 +1138,7 @@ def admin_activate_seller(user_id):
     if 'user_id' not in session or session.get('user_type') != 'admin':
         abort(403)
     
-    seller = User.query.get_or_404(user_id)
+    seller = db.session.query(User).get_or_404(user_id)
     if seller.user_type != 'seller':
         abort(400)
     
@@ -886,7 +1184,7 @@ def admin_send_message(user_id):
     if 'user_id' not in session or session.get('user_type') != 'admin':
         abort(403)
     
-    user = User.query.get_or_404(user_id)
+    user = db.session.query(User).get_or_404(user_id)
     
     if request.method == 'POST':
         subject = request.form.get('subject', 'Message from Burundian Market Admin')
@@ -914,8 +1212,9 @@ def seller_subscribe():
     if 'user_id' not in session or session.get('user_type') != 'seller':
         return redirect(url_for('login'))
     
-    user = User.query.get(session['user_id'])
-    return render_template('seller_subscribe.html', user=user)
+    user = db.session.query(User).get(session['user_id'])
+    subscription_status = user.get_subscription_status()
+    return render_template('seller_subscribe.html', user=user, subscription_status=subscription_status)
 
 # Process Subscription Choice
 @app.route('/seller/choose-subscription', methods=['POST'])
@@ -951,13 +1250,15 @@ def check_seller_subscription():
         return
     
     try:
-        user = User.query.get(session['user_id'])
+        user = db.session.query(User).get(session['user_id'])
         
         # Check if user exists
         if user is None:
             session.clear()  # Clear invalid session
             flash('User not found. Please login again.', 'error')
             return redirect(url_for('login'))
+        
+        status = user.get_subscription_status()
         
         # If seller's trial period is over (5 days)
         if user.is_seller_active and user.subscription_end is None:
@@ -966,44 +1267,21 @@ def check_seller_subscription():
                 user.is_seller_active = False
                 db.session.commit()
 
-                # Notify seller asynchronously
-                seller_body = f'''Hello {user.username},
-                
-Your 5-day trial period has ended. To continue publishing products, please subscribe to one of our plans.
-
-Thank you for using Burundian Market!
-'''
-                send_notification_email(user.email, 'Your Trial Period Has Ended', seller_body)
-                
-                # Notify admin asynchronously
-                admin_body = f'''Admin,
-                
-Seller {user.username} (ID: {user.id}) has ended their trial period and needs to subscribe.
-'''
-                send_notification_email('mugishapc1@gmail.com', 'Seller Trial Period Ended', admin_body)
+                # Notify seller with multiple methods
+                notify_subscription_status(user, 'trial_ended')
         
-        # If subscription is ending in 5 days
+        # If subscription is ending in 3 days
         elif user.is_seller_active and user.subscription_end:
             days_left = (user.subscription_end - datetime.now()).days
-            if days_left == 5:
-                # Notify seller asynchronously
-                seller_body = f'''Hello {user.username},
-                
-Your subscription will end in 5 days. Please renew to avoid service interruption.
-
-Thank you for using Burundian Market!
-'''
-                send_notification_email(user.email, 'Your Subscription is Ending Soon', seller_body)
-                
-                # Notify admin asynchronously
-                admin_body = f'''Admin,
-                
-Seller {user.username} (ID: {user.id}) has only 5 days left in their subscription.
-'''
-                send_notification_email('mugishapc1@gmail.com', 'Seller Subscription Ending Soon', admin_body)
+            if days_left == 3:
+                notify_subscription_status(user, 'subscription_ending')
+        
+        # If subscription has ended
+        elif not user.is_seller_active and user.subscription_end and user.subscription_end < datetime.now():
+            notify_subscription_status(user, 'subscription_ended')
         
         # Redirect to subscription page if not active
-        if not user.is_seller_active and request.endpoint not in ['seller_subscribe', 'choose_subscription', 'logout', 'static']:
+        if not user.is_seller_active and request.endpoint not in ['seller_subscribe', 'choose_subscription', 'logout', 'static', 'edit_profile']:
             flash('Your seller account is not active. Please subscribe to continue.', 'warning')
             return redirect(url_for('seller_subscribe'))
             
@@ -1057,7 +1335,7 @@ def cookie_preferences():
 @app.route('/keepalive', methods=['POST'])
 def keepalive():
     if 'user_id' in session:
-        user = User.query.get(session['user_id'])
+        user = db.session.query(User).get(session['user_id'])
         if user:
             user.last_activity = datetime.utcnow()
             db.session.commit()
@@ -1067,7 +1345,7 @@ def keepalive():
 @app.route('/checksession')
 def check_session():
     if 'user_id' in session:
-        user = User.query.get(session['user_id'])
+        user = db.session.query(User).get(session['user_id'])
         if user and (datetime.utcnow() - user.last_activity).total_seconds() < 3600:  # 1 hour
             return {'status': 'active'}, 200
     return {'status': 'expired'}, 401
@@ -1075,6 +1353,32 @@ def check_session():
 @app.route('/terms')
 def terms():
     return render_template('terms.html', now=datetime.now())
+
+# NEW: Add a route to clear image cache (for debugging)
+@app.route('/clear-image-cache')
+def clear_image_cache():
+    """Debug route to clear image cache issues"""
+    if 'user_id' not in session or session.get('user_type') != 'admin':
+        abort(403)
+    
+    # This forces browsers to reload images
+    return '''
+    <script>
+        // Clear browser cache for images
+        if (caches) {
+            caches.keys().then(function(names) {
+                for (let name of names)
+                    caches.delete(name);
+            });
+        }
+        // Force reload images
+        document.querySelectorAll('img').forEach(img => {
+            img.src = img.src + '?t=' + new Date().getTime();
+        });
+        alert('Image cache cleared!');
+        window.history.back();
+    </script>
+    '''
 
 if __name__ == '__main__':
     app.run(debug=True)

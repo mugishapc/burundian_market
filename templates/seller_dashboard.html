@@ -2,91 +2,393 @@
 {% block title %}Seller Dashboard{% endblock %}
 
 {% block content %}
+<!-- Subscription Status Banner -->
+{% if subscription_status %}
+<div class="alert 
+    {% if not subscription_status.active %}alert-danger
+    {% elif subscription_status.days_left <= 3 %}alert-warning
+    {% else %}alert-info{% endif %} mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="alert-heading">
+                <i class="fas fa-{% if not subscription_status.active %}exclamation-triangle{% elif subscription_status.days_left <= 3 %}clock{% else %}check-circle{% endif %} me-2"></i>
+                Subscription Status
+            </h5>
+            {% if subscription_status.status == 'trial' %}
+                <p class="mb-1"><strong>Trial Period:</strong> 
+                {% if subscription_status.active %}
+                    <span class="fw-bold">{{ subscription_status.days_left }} days remaining</span>
+                    {% if subscription_status.days_left <= 3 %}
+                        - Your trial ends soon! <a href="{{ url_for('seller_subscribe') }}" class="alert-link fw-bold">Subscribe now to continue selling!</a>
+                    {% endif %}
+                {% else %}
+                    <span class="fw-bold text-danger">ENDED</span> - <a href="{{ url_for('seller_subscribe') }}" class="alert-link fw-bold">Subscribe to activate your account</a>
+                {% endif %}
+                </p>
+            {% elif subscription_status.status == 'subscription' %}
+                <p class="mb-1"><strong>Subscription:</strong> 
+                {% if subscription_status.active %}
+                    <span class="fw-bold">{{ subscription_status.days_left }} days remaining</span>
+                    {% if subscription_status.days_left <= 3 %}
+                        - Your subscription ends soon! <a href="{{ url_for('seller_subscribe') }}" class="alert-link fw-bold">Renew now to avoid interruption!</a>
+                    {% endif %}
+                {% else %}
+                    <span class="fw-bold text-danger">ENDED</span> - <a href="{{ url_for('seller_subscribe') }}" class="alert-link fw-bold">Renew your subscription</a>
+                {% endif %}
+                </p>
+            {% else %}
+                <p class="mb-1"><strong>Account Status:</strong> <span class="fw-bold text-danger">INACTIVE</span> - <a href="{{ url_for('seller_subscribe') }}" class="alert-link fw-bold">Subscribe to start selling</a></p>
+            {% endif %}
+            
+            {% if subscription_status.active and subscription_status.days_left > 3 %}
+                <p class="mb-0 mt-2">
+                    <small>You can continue selling products while your account is active.</small>
+                </p>
+            {% endif %}
+        </div>
+        <div>
+            <a href="{{ url_for('seller_subscribe') }}" class="btn 
+                {% if not subscription_status.active %}btn-danger
+                {% elif subscription_status.days_left <= 3 %}btn-warning
+                {% else %}btn-info{% endif %}">
+                <i class="fas fa-shopping-cart me-1"></i>
+                {% if subscription_status.status == 'trial' and subscription_status.active %}
+                    Subscribe Now
+                {% elif subscription_status.status == 'subscription' and subscription_status.active %}
+                    Renew Subscription
+                {% else %}
+                    Activate Account
+                {% endif %}
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Seller Dashboard</h2>
-    <a href="{{ url_for('add_product') }}" class="btn btn-success">
-        <i class="fas fa-plus"></i> Add Product
-    </a>
+    <h2><i class="fas fa-store me-2"></i>Seller Dashboard</h2>
+    <div>
+        {% if user.is_seller_active %}
+            <a href="{{ url_for('add_product') }}" class="btn btn-success">
+                <i class="fas fa-plus"></i> Add Product
+            </a>
+        {% else %}
+            <button class="btn btn-success" disabled title="Subscribe to add products">
+                <i class="fas fa-plus"></i> Add Product
+            </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ products|length }}</h4>
+                        <p class="mb-0">Total Products</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-boxes fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">
+                            {% if subscription_status %}
+                                {{ subscription_status.days_left }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </h4>
+                        <p class="mb-0">Days Remaining</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-calendar-alt fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">
+                            {% if subscription_status and subscription_status.active %}
+                                Active
+                            {% else %}
+                                Inactive
+                            {% endif %}
+                        </h4>
+                        <p class="mb-0">Account Status</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-user-check fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">
+                            {% if subscription_status %}
+                                {{ subscription_status.status|title }}
+                            {% else %}
+                                Unknown
+                            {% endif %}
+                        </h4>
+                        <p class="mb-0">Plan Type</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-crown fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row">
     <div class="col-md-4 mb-4">
         <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0"><i class="fas fa-user me-2"></i>My Profile</h5>
+            </div>
             <div class="card-body">
-                <h5 class="card-title">My Profile</h5>
-                <p><strong>Username:</strong> {{ user.username }}</p>
-                <p><strong>Email:</strong> {{ user.email }}</p>
-                <p><strong>Phone:</strong> {{ user.phone }}</p>
-                <p><strong>Status:</strong> 
+                <p><strong><i class="fas fa-user me-2"></i>Username:</strong> {{ user.username }}</p>
+                <p><strong><i class="fas fa-envelope me-2"></i>Email:</strong> {{ user.email }}</p>
+                <p><strong><i class="fas fa-phone me-2"></i>Phone:</strong> {{ user.phone or 'Not provided' }}</p>
+                <p><strong><i class="fas fa-shield-alt me-2"></i>Status:</strong> 
                     <span class="badge bg-{{ 'success' if user.is_verified else 'warning' }}">
                         {{ 'Verified' if user.is_verified else 'Not Verified' }}
                     </span>
                 </p>
-                <a href="{{ url_for('edit_profile') }}" class="btn btn-sm btn-primary mt-2">
-                    <i class="fas fa-user-edit"></i> Edit Profile
-                </a>
+                <p><strong><i class="fas fa-store me-2"></i>Seller Status:</strong> 
+                    <span class="badge bg-{{ 'success' if user.is_seller_active else 'danger' }}">
+                        {{ 'Active' if user.is_seller_active else 'Inactive' }}
+                    </span>
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('edit_profile') }}" class="btn btn-primary">
+                        <i class="fas fa-user-edit"></i> Edit Profile
+                    </a>
+                    {% if not user.is_seller_active %}
+                    <a href="{{ url_for('seller_subscribe') }}" class="btn btn-success">
+                        <i class="fas fa-shopping-cart"></i> Subscribe Now
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscription Info Card -->
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0"><i class="fas fa-crown me-2"></i>Subscription Info</h5>
+            </div>
+            <div class="card-body">
+                {% if subscription_status %}
+                    {% if subscription_status.status == 'trial' %}
+                        <p><strong>Plan:</strong> <span class="badge bg-warning">5-Day Trial</span></p>
+                        {% if subscription_status.active %}
+                            <p><strong>Started:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
+                            <p><strong>Ends:</strong> In {{ subscription_status.days_left }} days</p>
+                        {% else %}
+                            <p><strong>Started:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
+                            <p><strong>Ended:</strong> Trial period completed</p>
+                        {% endif %}
+                    {% elif subscription_status.status == 'subscription' %}
+                        <p><strong>Plan:</strong> <span class="badge bg-success">Paid Subscription</span></p>
+                        {% if user.subscription_start %}
+                            <p><strong>Started:</strong> {{ user.subscription_start.strftime('%Y-%m-%d') }}</p>
+                        {% endif %}
+                        {% if user.subscription_end %}
+                            <p><strong>Ends:</strong> {{ user.subscription_end.strftime('%Y-%m-%d') }}</p>
+                        {% endif %}
+                    {% endif %}
+                    
+                    <p><strong>Days Left:</strong> 
+                        <span class="fw-bold {% if subscription_status.days_left <= 3 %}text-danger{% elif subscription_status.days_left <= 7 %}text-warning{% else %}text-success{% endif %}">
+                            {{ subscription_status.days_left }}
+                        </span>
+                    </p>
+                    
+                    <div class="progress mb-3">
+                        {% if subscription_status.status == 'trial' %}
+                            {% set total_days = 5 %}
+                            {% set days_used = 5 - subscription_status.days_left %}
+                            {% set percentage = (days_used / total_days) * 100 %}
+                        {% else %}
+                            {% if user.subscription_start and user.subscription_end %}
+                                {% set total_days = (user.subscription_end - user.subscription_start).days %}
+                                {% set days_used = total_days - subscription_status.days_left %}
+                                {% set percentage = (days_used / total_days) * 100 %}
+                            {% else %}
+                                {% set total_days = 30 %}
+                                {% set days_used = 30 - subscription_status.days_left %}
+                                {% set percentage = (days_used / total_days) * 100 %}
+                            {% endif %}
+                        {% endif %}
+                        
+                        <div class="progress-bar 
+                            {% if percentage >= 80 %}bg-danger
+                            {% elif percentage >= 60 %}bg-warning
+                            {% else %}bg-success{% endif %}" 
+                            role="progressbar" 
+                            style="width: {{ percentage }}%"
+                            aria-valuenow="{{ percentage }}" 
+                            aria-valuemin="0" 
+                            aria-valuemax="100">
+                            {{ "%.0f"|format(percentage) }}%
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <a href="{{ url_for('seller_subscribe') }}" class="btn 
+                            {% if subscription_status.days_left <= 3 %}btn-warning
+                            {% else %}btn-outline-info{% endif %}">
+                            <i class="fas fa-sync-alt me-1"></i>
+                            {% if subscription_status.status == 'trial' %}
+                                Upgrade Now
+                            {% else %}
+                                Renew Subscription
+                            {% endif %}
+                        </a>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No subscription information available.</p>
+                    <div class="d-grid">
+                        <a href="{{ url_for('seller_subscribe') }}" class="btn btn-success">
+                            <i class="fas fa-shopping-cart me-1"></i>
+                            Get Started
+                        </a>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
     <div class="col-md-8">
-        <h4>My Products</h4>
-        {% if products %}
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Image</th>
-                            <th>Title</th>
-                            <th>Price</th>
-                            <th>Category</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for product in products %}
-                        <tr>
-                            <td>
-                                {% if product.image %}
-                                <img src="{{ url_for('static', filename=product.image) }}" 
-                                     alt="{{ product.title }}" 
-                                     style="width: 50px; height: 50px; object-fit: cover;">
-                                {% else %}
-                                <div style="width: 50px; height: 50px; background-color: #eee;"></div>
-                                {% endif %}
-                            </td>
-                            <td>{{ product.title }}</td>
-                            <td>{{ product.price }} BIF</td>
-                            <td>{{ product.category }}</td>
-                            <td>
-                                <a href="{{ url_for('product_detail', product_id=product.id) }}" 
-                                   class="btn btn-sm btn-primary">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <a href="{{ url_for('edit_product', product_id=product.id) }}" 
-                                   class="btn btn-sm btn-warning">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <form action="{{ url_for('delete_product', product_id=product.id) }}" 
-                                      method="POST" 
-                                      class="d-inline"
-                                      onsubmit="return confirm('Are you sure you want to delete this product?');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn btn-sm btn-danger">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="fas fa-boxes me-2"></i>My Products</h5>
+                <span class="badge bg-light text-primary">{{ products|length }} products</span>
             </div>
-        {% else %}
-            <div class="alert alert-info">
-                You haven't listed any products yet. <a href="{{ url_for('add_product') }}">Add your first product</a>.
+            <div class="card-body">
+                {% if products %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Image</th>
+                                    <th>Title</th>
+                                    <th>Price</th>
+                                    <th>Category</th>
+                                    <th>Date Added</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in products %}
+                                <tr>
+                                    <td>
+                                        {% if product.image %}
+                                        <img src="{{ url_for('static', filename=product.image) }}" 
+                                             alt="{{ product.title }}" 
+                                             class="rounded"
+                                             style="width: 50px; height: 50px; object-fit: cover;">
+                                        {% else %}
+                                        <div class="rounded d-flex align-items-center justify-content-center" 
+                                             style="width: 50px; height: 50px; background-color: #eee; color: #999;">
+                                            <i class="fas fa-image"></i>
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ product.title }}</strong>
+                                        {% if product.description %}
+                                        <br><small class="text-muted">{{ product.description[:50] }}{% if product.description|length > 50 %}...{% endif %}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td><strong>{{ "{:,.0f}".format(product.price) }} BIF</strong></td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ product.category or 'Uncategorized' }}</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ product.created_at.strftime('%Y-%m-%d') }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{{ url_for('product_detail', product_id=product.id) }}" 
+                                               class="btn btn-outline-primary" 
+                                               title="View Product">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if user.is_seller_active %}
+                                            <a href="{{ url_for('edit_product', product_id=product.id) }}" 
+                                               class="btn btn-outline-warning"
+                                               title="Edit Product">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <form action="{{ url_for('delete_product', product_id=product.id) }}" 
+                                                  method="POST" 
+                                                  class="d-inline"
+                                                  onsubmit="return confirm('Are you sure you want to delete {{ product.title }}? This action cannot be undone.');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-outline-danger" title="Delete Product">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                            {% else %}
+                                            <button class="btn btn-outline-warning" disabled title="Subscribe to edit products">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" disabled title="Subscribe to delete products">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
+                        <h4 class="text-muted">No Products Yet</h4>
+                        <p class="text-muted mb-4">You haven't listed any products yet.</p>
+                        {% if user.is_seller_active %}
+                            <a href="{{ url_for('add_product') }}" class="btn btn-success btn-lg">
+                                <i class="fas fa-plus me-2"></i>Add Your First Product
+                            </a>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <p class="mb-2">You need an active subscription to add products.</p>
+                                <a href="{{ url_for('seller_subscribe') }}" class="btn btn-warning">
+                                    <i class="fas fa-shopping-cart me-1"></i>Subscribe Now
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
             </div>
-        {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}

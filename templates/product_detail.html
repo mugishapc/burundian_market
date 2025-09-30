@@ -5,14 +5,18 @@
 <div class="row">
     <div class="col-md-6">
         {% if product.image %}
-            <img src="{{ url_for('static', filename=product.image) }}" 
-                 class="img-fluid rounded" 
+            <img src="{{ url_for('static', filename=product.image) }}?t={{ range(1, 100000) | random }}" 
+                 class="img-fluid rounded product-img" 
                  alt="{{ product.title }}"
-                 style="max-height: 500px; object-fit: contain;">
+                 style="max-height: 500px; object-fit: contain;"
+                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
         {% else %}
-            <div class="bg-secondary d-flex align-items-center justify-content-center" 
+            <div class="bg-secondary d-flex align-items-center justify-content-center rounded" 
                  style="height: 300px; width: 100%;">
-                <span class="text-white">No Image Available</span>
+                <span class="text-white">
+                    <i class="fas fa-image fa-2x me-2"></i>
+                    No Image Available
+                </span>
             </div>
         {% endif %}
     </div>
@@ -77,12 +81,15 @@
             <div class="card h-100">
                 <a href="{{ url_for('product_detail', product_id=similar.id) }}">
                     {% if similar.image %}
-                    <img src="{{ url_for('static', filename=similar.image) }}" 
-                         class="card-img-top" 
+                    <img src="{{ url_for('static', filename=similar.image) }}?t={{ range(1, 100000) | random }}" 
+                         class="card-img-top product-img" 
                          alt="{{ similar.title }}"
-                         style="height: 200px; object-fit: cover;">
+                         style="height: 200px; object-fit: cover;"
+                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
                     {% else %}
-                    <div class="card-img-top bg-secondary" style="height: 200px;"></div>
+                    <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="height: 200px;">
+                        <i class="fas fa-image text-white"></i>
+                    </div>
                     {% endif %}
                 </a>
                 <div class="card-body">
@@ -99,4 +106,24 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+    // Force image reload for this page
+    document.addEventListener('DOMContentLoaded', function() {
+        const mainImage = document.querySelector('.img-fluid.rounded');
+        if (mainImage && mainImage.src) {
+            const originalSrc = mainImage.src.split('?')[0];
+            mainImage.src = originalSrc + '?t=' + new Date().getTime();
+        }
+        
+        // Reload similar product images
+        const similarImages = document.querySelectorAll('.card-img-top.product-img');
+        similarImages.forEach(img => {
+            if (img.src) {
+                const originalSrc = img.src.split('?')[0];
+                img.src = originalSrc + '?t=' + new Date().getTime();
+            }
+        });
+    });
+</script>
 {% endblock %}

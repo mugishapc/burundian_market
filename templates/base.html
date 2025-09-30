@@ -7,6 +7,36 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Image caching fix -->
+    <style>
+        .product-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background-color: #f8f9fa;
+        }
+        .image-placeholder {
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 14px;
+            height: 200px;
+        }
+        
+        /* Force image reloading after session changes */
+        img[src*="uploads"] {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+        
+        /* Cache busting for product images */
+        .product-img {
+            transform: translateZ(0);
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -172,8 +202,31 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    
+    <!-- Image Cache Busting Script -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            // Image cache busting for product images
+            function bustImageCache() {
+                const images = document.querySelectorAll('img[src*="uploads"], img.product-image');
+                const timestamp = new Date().getTime();
+                
+                images.forEach(img => {
+                    const src = img.src;
+                    if (src.includes('uploads')) {
+                        // Add timestamp to force reload
+                        if (!src.includes('?')) {
+                            img.src = src + '?t=' + timestamp;
+                        } else if (!src.includes('t=')) {
+                            img.src = src + '&t=' + timestamp;
+                        }
+                    }
+                });
+            }
+            
+            // Bust cache on page load and after login/logout
+            bustImageCache();
+            
             // Check if cookie consent is needed
             if (!localStorage.getItem('cookieConsent') && !document.cookie.includes('cookie_preferences')) {
                 document.getElementById('cookieConsent').style.display = 'block';
@@ -196,12 +249,31 @@
             if (cookiePrefs && typeof initCookies === 'function') {
                 initCookies(cookiePrefs);
             }
+            
+            // Session keep-alive to prevent image issues
+            setInterval(() => {
+                fetch('{{ url_for("keepalive") }}', {
+                    method: 'POST',
+                    credentials: 'include'
+                }).catch(() => {});
+            }, 300000); // 5 minutes
         });
 
         function getCookie(name) {
             const value = `; ${document.cookie}`;
             const parts = value.split(`; ${name}=`);
             if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+        
+        // Global function to reload product images
+        function reloadProductImages() {
+            const images = document.querySelectorAll('.product-image, img[src*="uploads"]');
+            const timestamp = new Date().getTime();
+            
+            images.forEach(img => {
+                const originalSrc = img.src.split('?')[0];
+                img.src = originalSrc + '?t=' + timestamp;
+            });
         }
     </script>
     {% block scripts %}{% endblock %}

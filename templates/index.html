@@ -16,7 +16,16 @@
         {% for product in products %}
         <div class="col-md-3 mb-4">
             <div class="card h-100">
-                <img src="{{ url_for('static', filename=product.image) }}" class="card-img-top product-image" alt="{{ product.title }}">
+                {% if product.image %}
+                    <img src="{{ url_for('static', filename=product.image) }}?t={{ range(1, 100000) | random }}" 
+                         class="card-img-top product-image product-img" 
+                         alt="{{ product.title }}"
+                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
+                {% else %}
+                    <div class="image-placeholder card-img-top">
+                        <i class="fas fa-image fa-2x text-muted"></i>
+                    </div>
+                {% endif %}
                 <div class="card-body">
                     <h5 class="card-title">{{ product.title }}</h5>
                     <p class="card-text text-success fw-bold">{{ product.price }} BIF</p>
@@ -27,4 +36,18 @@
         {% endfor %}
     </div>
 </div>
+
+<script>
+    // Additional image loading assurance
+    document.addEventListener('DOMContentLoaded', function() {
+        // Preload images with cache busting
+        const images = document.querySelectorAll('.product-image');
+        images.forEach(img => {
+            const originalSrc = img.src;
+            if (originalSrc && !originalSrc.includes('?')) {
+                img.src = originalSrc + '?t=' + new Date().getTime();
+            }
+        });
+    });
+</script>
 {% endblock %}
