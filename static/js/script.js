@@ -1,6 +1,6 @@
-// Basic form validation
+// Enhanced form validation and image handling
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Script loaded');
+    console.log('Script loaded - initializing enhanced image handling');
 
     // Basic form validation
     const loginForm = document.querySelector("form[action='{{ url_for('login') }}']");
@@ -47,12 +47,27 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Image preview for product upload
+    // Enhanced image preview for product upload
     const imageInput = document.getElementById('image');
     if (imageInput) {
         imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
+                // Validate file type
+                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                if (!validTypes.includes(file.type)) {
+                    alert('Please select a valid image file (JPEG, PNG, GIF)');
+                    this.value = '';
+                    return;
+                }
+                
+                // Validate file size (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Image size should be less than 5MB');
+                    this.value = '';
+                    return;
+                }
+                
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     const preview = document.getElementById('image-preview');
@@ -70,6 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         previewImg.src = event.target.result;
                         previewImg.className = 'img-thumbnail';
                         previewImg.style.maxHeight = '200px';
+                        previewImg.style.maxWidth = '100%';
                         
                         previewContainer.appendChild(previewTitle);
                         previewContainer.appendChild(previewImg);
@@ -83,4 +99,33 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Global image reload function
+    window.reloadProductImages = function() {
+        console.log('Reloading product images...');
+        const images = document.querySelectorAll('.product-image');
+        const timestamp = new Date().getTime();
+        
+        images.forEach(img => {
+            const originalSrc = img.src.split('?')[0];
+            img.src = originalSrc + '?reload=' + timestamp;
+        });
+    };
+    
+    // Auto-reload images every 30 seconds to ensure they're fresh
+    setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            window.reloadProductImages();
+        }
+    }, 30000);
+    
+    // Enhanced error handling for all images
+    document.querySelectorAll('img').forEach(img => {
+        if (img.classList.contains('product-image')) {
+            img.addEventListener('error', function() {
+                console.warn('Product image failed:', this.src);
+                // Don't replace with placeholder for product images - let retry logic handle it
+            });
+        }
+    });
 });

@@ -450,9 +450,8 @@ def get_image_url(image_path):
 # Routes
 @app.route('/')
 def home():
-    products = Product.query.join(User).filter(
-        User.is_seller_active == True
-    ).order_by(Product.created_at.desc()).limit(8).all()
+    # MODIFIED: Show ALL products regardless of seller status
+    products = Product.query.order_by(Product.created_at.desc()).limit(8).all()
     
     # Ensure proper image URLs with cache busting
     for product in products:
@@ -517,10 +516,8 @@ def product_search():
     page = request.args.get('page', 1, type=int)
     per_page = 12  # Products per page
 
-    # Base query - active sellers only
-    products_query = Product.query.join(User).filter(
-        User.is_seller_active == True
-    )
+    # MODIFIED: Show ALL products regardless of seller status
+    products_query = Product.query
 
     # Apply search query filter (searches across all categories)
     if query:
@@ -789,6 +786,7 @@ def buyer_dashboard():
     categories = db.session.query(Product.category.distinct()).filter(Product.category.isnot(None)).all()
     categories = [c[0] for c in categories if c[0]]
     
+    # MODIFIED: Show ALL products regardless of seller status
     products = Product.query.order_by(Product.created_at.desc()).all()
     
     # Ensure proper image URLs
@@ -859,12 +857,10 @@ def product_detail(product_id):
     # Check if the current user is the seller
     is_seller = 'user_id' in session and session['user_id'] == product.seller_id
     
-    # Get similar products
+    # MODIFIED: Show similar products regardless of seller status
     similar_products = Product.query.filter(
         Product.category == product.category,
-        Product.id != product.id,
-        Product.seller_id == User.id,
-        User.is_seller_active == True
+        Product.id != product.id
     ).limit(4).all()
     
     # Ensure proper image URLs for similar products

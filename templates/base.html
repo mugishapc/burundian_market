@@ -24,6 +24,15 @@
             font-size: 14px;
             height: 200px;
         }
+        .image-loading {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
 <body>
@@ -170,16 +179,57 @@
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     
     <script>
-        // Simple image error handling
+        // Enhanced image error handling with retry logic
         document.addEventListener('DOMContentLoaded', function() {
-            // Add error handlers to all images
-            document.querySelectorAll('img').forEach(img => {
+            console.log('Base template loaded - initializing image handlers');
+            
+            // Add error handlers to all product images
+            document.querySelectorAll('.product-image').forEach(img => {
+                const originalSrc = img.src;
+                let retryCount = 0;
+                const maxRetries = 3;
+                
                 img.addEventListener('error', function() {
-                    if (!this.src.includes('placeholder.svg')) {
-                        this.src = '{{ url_for("static", filename="images/placeholder.svg") }}?v=1';
+                    console.warn('Image failed to load:', this.src);
+                    retryCount++;
+                    
+                    if (retryCount <= maxRetries) {
+                        // Add cache busting and retry
+                        const timestamp = new Date().getTime();
+                        const separator = this.src.includes('?') ? '&' : '?';
+                        this.src = originalSrc.split('?')[0] + separator + 'retry=' + retryCount + '&t=' + timestamp;
+                        console.log(`Retrying image load (${retryCount}/${maxRetries}):`, this.src);
+                    } else {
+                        // Final fallback
+                        if (!this.src.includes('placeholder.svg')) {
+                            this.src = '{{ url_for("static", filename="images/placeholder.svg") }}?v=1';
+                            this.classList.add('image-failed');
+                            console.log('Using placeholder for failed image');
+                        }
                     }
                 });
+                
+                img.addEventListener('load', function() {
+                    this.classList.add('image-loaded');
+                    this.classList.remove('image-loading');
+                    console.log('Image loaded successfully:', this.src);
+                });
+                
+                // Add loading state
+                if (!img.complete) {
+                    img.classList.add('image-loading');
+                }
             });
+            
+            // Global function to reload all images
+            window.reloadAllImages = function() {
+                console.log('Reloading all images...');
+                document.querySelectorAll('.product-image').forEach(img => {
+                    const originalSrc = img.src.split('?')[0];
+                    const timestamp = new Date().getTime();
+                    img.src = originalSrc + '?reload=' + timestamp;
+                });
+            };
         });
     </script>
     {% block scripts %}{% endblock %}

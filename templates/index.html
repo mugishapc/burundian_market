@@ -23,7 +23,7 @@
                          alt="{{ product.title }}"
                          style="height: 200px; object-fit: cover;"
                          loading="lazy"
-                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}?v=1'; this.classList.add('image-failed');">
+                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.svg') }}?v=1'; this.classList.add('image-failed');">
                 {% else %}
                     <div class="image-placeholder card-img-top d-flex align-items-center justify-content-center">
                         <div class="text-center">
@@ -37,6 +37,9 @@
                     <p class="card-text text-success fw-bold">{{ "%.0f"|format(product.price) }} BIF</p>
                     <p class="card-text small text-muted">
                         <i class="fas fa-store"></i> {{ product.seller.username }}
+                        {% if not product.seller.is_seller_active %}
+                            <span class="badge bg-warning ms-1">Inactive</span>
+                        {% endif %}
                     </p>
                     <div class="mt-auto">
                         <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn btn-primary w-100">View Details</a>
@@ -77,7 +80,7 @@
                     // Enhanced error handling
                     img.onerror = function() {
                         console.warn('Image failed to load:', this.src);
-                        this.src = '{{ url_for("static", filename="images/placeholder.jpg") }}?v=2';
+                        this.src = '{{ url_for("static", filename="images/placeholder.svg") }}?v=2';
                         this.classList.add('image-load-failed');
                     };
                     

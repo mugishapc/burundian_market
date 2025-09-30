@@ -12,6 +12,30 @@ body {
 .product-image {
     height: 200px;
     object-fit: cover;
+    transition: opacity 0.3s ease;
+}
+
+.product-image.image-loading {
+    opacity: 0.7;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+.product-image.image-loaded {
+    opacity: 1;
+}
+
+.product-image.image-failed {
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 /* Card hover effect */
@@ -24,9 +48,31 @@ body {
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
 }
 
+/* Image placeholder styles */
+.image-placeholder {
+    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 14px;
+    height: 200px;
+    border: 1px solid #dee2e6;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .product-image {
         height: 150px;
     }
+    
+    .image-placeholder {
+        height: 150px;
+    }
+}
+
+/* Badge styles for inactive sellers */
+.badge.bg-warning {
+    font-size: 0.7em;
+    padding: 0.2em 0.4em;
 }
