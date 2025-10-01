@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% block title %}Subscription Requests{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-hourglass-half me-2"></i>Subscription Requests</h2>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                    <strong>{{ category|title }}:</strong> {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Pending Requests -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-clock me-2"></i>Pending Requests
+                <span class="badge bg-danger ms-2">{{ pending_requests|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if pending_requests %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Seller Info</th>
+                            <th>Subscription Plan</th>
+                            <th>Payment Details</th>
+                            <th>Submitted</th>
+                            <th>Payment Proof</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for request in pending_requests %}
+                        <tr>
+                            <td>
+                                <strong>{{ request.seller.username }}</strong>
+                                <br>
+                                <small class="text-muted">{{ request.seller.email }}</small>
+                                <br>
+                                <small class="text-muted">Phone: {{ request.seller.phone or 'Not provided' }}</small>
+                                <br>
+                                <a href="{{ url_for('admin_view_user', user_id=request.seller.id) }}" 
+                                   class="btn btn-sm btn-outline-primary mt-1">
+                                    <i class="fas fa-user me-1"></i>View Profile
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge bg-primary fs-6">{{ request.subscription_days }} days</span>
+                                <br>
+                                <strong class="text-success">{{ request.amount|format_currency }} BIF</strong>
+                            </td>
+                            <td>
+                                <small>
+                                    <strong>Amount Paid:</strong> {{ request.amount|format_currency }} BIF<br>
+                                    <strong>Period:</strong> {{ request.subscription_days }} days<br>
+                                    <strong>Status:</strong> 
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                </small>
+                            </td>
+                            <td>
+                                <small>
+                                    {{ request.created_at.strftime('%Y-%m-%d') }}<br>
+                                    {{ request.created_at.strftime('%H:%M') }}<br>
+                                    <span class="text-muted">{{ request.created_at|timesince }} ago</span>
+                                </small>
+                            </td>
+                            <td>
+                                {% if request.payment_proof_filename %}
+                                <div class="d-flex flex-column gap-1">
+                                    <a href="{{ get_payment_proof_url(request.payment_proof_filename) }}" 
+                                       target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye me-1"></i>View Proof
+                                    </a>
+                                    <small class="text-muted text-center">Click to verify</small>
+                                </div>
+                                {% else %}
+                                <span class="badge bg-danger">No proof</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column gap-2">
+                                    <form action="{{ url_for('admin_approve_subscription', request_id=request.id) }}" 
+                                          method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-success btn-sm w-100" 
+                                                onclick="return confirm('Approve {{ request.seller.username }}\\'s {{ request.subscription_days }}-day subscription for {{ request.amount|format_currency }} BIF?')">
+                                            <i class="fas fa-check me-1"></i> Approve
+                                        </button>
+                                    </form>
+                                    
+                                    <form action="{{ url_for('admin_reject_subscription', request_id=request.id) }}" 
+                                          method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="notes" value="Payment proof not valid">
+                                        <button type="submit" class="btn btn-danger btn-sm w-100" 
+                                                onclick="return confirm('Reject {{ request.seller.username }}\\'s subscription request?')">
+                                            <i class="fas fa-times me-1"></i> Reject
+                                        </button>
+                                    </form>
+
+                                    <!-- Custom Rejection Reasons -->
+                                    <div class="dropdown">
+                                        <button class="btn btn-outline-danger btn-sm w-100 dropdown-toggle" 
+                                                type="button" data-bs-toggle="dropdown">
+                                            <i class="fas fa-ban me-1"></i> Reject With Reason
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <form action="{{ url_for('admin_reject_subscription', request_id=request.id) }}" 
+                                                      method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="notes" value="Payment proof unclear or blurry">
+                                                    <button type="submit" class="dropdown-item">
+                                                        Unclear Payment Proof
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form action="{{ url_for('admin_reject_subscription', request_id=request.id) }}" 
+                                                      method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="notes" value="Incorrect payment amount">
+                                                    <button type="submit" class="dropdown-item">
+                                                        Wrong Amount
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form action="{{ url_for('admin_reject_subscription', request_id=request.id) }}" 
+                                                      method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="notes" value="Payment proof does not match subscription plan">
+                                                    <button type="submit" class="dropdown-item">
+                                                        Proof Mismatch
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                <h5>No Pending Requests</h5>
+                <p class="text-muted">All subscription requests have been processed.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Processed Requests -->
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-history me-2"></i>Recently Processed Requests
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if processed_requests %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Seller</th>
+                            <th>Plan</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Processed</th>
+                            <th>Admin Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for request in processed_requests %}
+                        <tr>
+                            <td>
+                                <strong>{{ request.seller.username }}</strong>
+                                <br>
+                                <small class="text-muted">{{ request.seller.email }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ request.subscription_days }} days</span>
+                                <br>
+                                <strong>{{ request.amount|format_currency }} BIF</strong>
+                            </td>
+                            <td>
+                                {{ request.amount|format_currency }} BIF
+                            </td>
+                            <td>
+                                {% if request.status == 'approved' %}
+                                <span class="badge bg-success">Approved</span>
+                                {% else %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>
+                                    {{ request.processed_at.strftime('%Y-%m-%d %H:%M') }}<br>
+                                    <span class="text-muted">by Admin</span>
+                                </small>
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ request.notes or 'No notes' }}</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                <h5>No Processed Requests</h5>
+                <p class="text-muted">No subscription requests have been processed yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.dropdown-menu {
+    min-width: 200px;
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Subscription requests page loaded');
+    
+    // Auto-refresh pending requests every minute
+    setInterval(function() {
+        fetch(window.location.href)
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const newDocument = parser.parseFromString(html, 'text/html');
+                const newPendingCount = newDocument.querySelector('.bg-warning .badge')?.textContent || '0';
+                const currentPendingCount = document.querySelector('.bg-warning .badge').textContent;
+                
+                if (newPendingCount !== currentPendingCount) {
+                    location.reload();
+                }
+            })
+            .catch(error => console.log('Auto-refresh failed:', error));
+    }, 60000); // 1 minute
+});
+</script>
+{% endblock %}

@@ -37,10 +37,12 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 # File-based image storage configuration
 UPLOAD_FOLDER = 'static/uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+PAYMENT_PROOF_FOLDER = 'static/payment_proofs'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['PAYMENT_PROOF_FOLDER'] = PAYMENT_PROOF_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 # Email Configuration with timeout
@@ -68,6 +70,18 @@ app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
 db = SQLAlchemy(app)
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
+
+# Custom Jinja2 Filters
+@app.template_filter('format_currency')
+def format_currency(value):
+    """Format number as currency with commas"""
+    try:
+        if value is None:
+            return "0"
+        # Format with commas for thousands
+        return "{:,.0f}".format(float(value))
+    except (ValueError, TypeError):
+        return str(value)
 
 # Database Models
 class User(db.Model):
@@ -100,6 +114,11 @@ class User(db.Model):
     # New field for subscription notifications
     last_notification_sent = db.Column(db.DateTime, nullable=True)
     
+    # New field for pending subscription
+    has_pending_subscription = db.Column(db.Boolean, default=False)
+    pending_subscription_days = db.Column(db.Integer, nullable=True)
+    pending_payment_proof = db.Column(db.String(200), nullable=True)
+    
     def is_active(self):
         """Check if user session should still be valid"""
         return datetime.now() - self.last_active < timedelta(hours=1)
@@ -114,16 +133,18 @@ class User(db.Model):
                 return {
                     'status': 'trial',
                     'days_left': max(0, days_left),
-                    'active': days_left > 0
+                    'active': days_left > 0,
+                    'is_active': days_left > 0
                 }
             else:
-                return {'status': 'inactive', 'days_left': 0, 'active': False}
+                return {'status': 'inactive', 'days_left': 0, 'active': False, 'is_active': False}
         else:
             days_left = (self.subscription_end - datetime.now()).days
             return {
                 'status': 'subscription',
                 'days_left': max(0, days_left),
-                'active': days_left > 0 and self.is_seller_active
+                'active': days_left > 0 and self.is_seller_active,
+                'is_active': days_left > 0 and self.is_seller_active
             }
 
     def __repr__(self):
@@ -147,6 +168,23 @@ class Product(db.Model):
     def __repr__(self):
         return f'<Product {self.title}>'
 
+class SubscriptionRequest(db.Model):
+    __tablename__ = 'subscription_requests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    seller_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    subscription_days = db.Column(db.Integer, nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    payment_proof_filename = db.Column(db.String(200), nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    processed_at = db.Column(db.DateTime, nullable=True)
+    processed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    
+    seller = db.relationship('User', foreign_keys=[seller_id], backref=db.backref('subscription_requests', lazy=True))
+    admin = db.relationship('User', foreign_keys=[processed_by])
+
 # IMPROVED DATABASE INITIALIZATION - Handles schema updates
 def initialize_database():
     """Initialize database tables and handle schema updates"""
@@ -161,32 +199,31 @@ def initialize_database():
             if 'products' in existing_tables:
                 print("ℹ️  Tables already exist, checking for schema updates...")
                 
-                # Check if image_data column exists
-                product_columns = [col['name'] for col in inspector.get_columns('products')]
+                # Check if subscription_requests table exists
+                if 'subscription_requests' not in existing_tables:
+                    print("🆕 Creating subscription_requests table...")
+                    db.create_all()
+                    print("✅ Created subscription_requests table")
                 
-                if 'image_data' not in product_columns:
-                    print("🔄 Adding missing columns: image_data and image_filename")
-                    try:
-                        # Add the missing columns using raw SQL
-                        with db.engine.connect() as conn:
-                            conn.execute(text('ALTER TABLE products ADD COLUMN image_data TEXT'))
-                            conn.execute(text('ALTER TABLE products ADD COLUMN image_filename VARCHAR(200)'))
-                            conn.commit()
-                        print("✅ Added image_data and image_filename columns")
-                    except Exception as e:
-                        print(f"⚠️  Could not add columns: {e}")
-                
-                # Check if last_notification_sent column exists in users
+                # Check if new columns exist in users table
                 users_columns = [col['name'] for col in inspector.get_columns('users')]
-                if 'last_notification_sent' not in users_columns:
-                    print("🔄 Adding missing column: last_notification_sent")
-                    try:
-                        with db.engine.connect() as conn:
-                            conn.execute(text('ALTER TABLE users ADD COLUMN last_notification_sent TIMESTAMP'))
-                            conn.commit()
-                        print("✅ Added last_notification_sent column")
-                    except Exception as e:
-                        print(f"⚠️  Could not add column: {e}")
+                new_columns = ['has_pending_subscription', 'pending_subscription_days', 'pending_payment_proof']
+                
+                for column in new_columns:
+                    if column not in users_columns:
+                        print(f"🔄 Adding missing column: {column}")
+                        try:
+                            with db.engine.connect() as conn:
+                                if column == 'has_pending_subscription':
+                                    conn.execute(text('ALTER TABLE users ADD COLUMN has_pending_subscription BOOLEAN DEFAULT FALSE'))
+                                elif column == 'pending_subscription_days':
+                                    conn.execute(text('ALTER TABLE users ADD COLUMN pending_subscription_days INTEGER'))
+                                elif column == 'pending_payment_proof':
+                                    conn.execute(text('ALTER TABLE users ADD COLUMN pending_payment_proof VARCHAR(200)'))
+                                conn.commit()
+                            print(f"✅ Added {column} column")
+                        except Exception as e:
+                            print(f"⚠️  Could not add {column}: {e}")
                 
                 # Create admin user if not exists - using safer approach
                 try:
@@ -230,9 +267,10 @@ def initialize_database():
                 except Exception as e:
                     print(f"⚠️  Could not create admin user: {e}")
             
-            # Create uploads directory
+            # Create uploads directories
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            print("✅ Uploads directory created")
+            os.makedirs(app.config['PAYMENT_PROOF_FOLDER'], exist_ok=True)
+            print("✅ Upload directories created")
             
             print("🎉 Database initialized successfully!")
             
@@ -450,7 +488,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def save_image_file(image_file):
+def save_image_file(image_file, folder='uploads'):
     """Save image as file and return filename"""
     if not image_file or image_file.filename == '':
         return None
@@ -475,16 +513,22 @@ def save_image_file(image_file):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_")
         filename = timestamp + filename
         
+        # Determine folder path
+        if folder == 'payment_proofs':
+            folder_path = app.config['PAYMENT_PROOF_FOLDER']
+        else:
+            folder_path = app.config['UPLOAD_FOLDER']
+        
         # Save file
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        filepath = os.path.join(folder_path, filename)
         image_file.save(filepath)
         
-        print(f"✅ Image saved as file: {filename}")
+        print(f"✅ File saved: {filename} in {folder}")
         return filename
         
     except Exception as e:
-        print(f"❌ Error saving image file: {e}")
-        flash('Error saving image file. Please try again.', 'danger')
+        print(f"❌ Error saving file: {e}")
+        flash('Error saving file. Please try again.', 'danger')
         return None
 
 def get_image_url(product):
@@ -494,6 +538,13 @@ def get_image_url(product):
     
     image_url = url_for('static', filename=f'uploads/{product.image_filename}')
     return image_url
+
+def get_payment_proof_url(filename):
+    """Get payment proof URL"""
+    if not filename:
+        return None
+    
+    return url_for('static', filename=f'payment_proofs/{filename}')
 
 def convert_base64_to_file(product):
     """Convert base64 image data to file storage"""
@@ -549,12 +600,14 @@ def test_db():
     try:
         users_count = db.session.query(User).count()
         products_count = db.session.query(Product).count()
+        subscription_requests_count = db.session.query(SubscriptionRequest).count()
         
         return jsonify({
             'status': 'success',
             'message': 'Database working without migrations!',
             'users_count': users_count,
-            'products_count': products_count
+            'products_count': products_count,
+            'subscription_requests_count': subscription_requests_count
         })
     except Exception as e:
         return jsonify({
@@ -859,10 +912,17 @@ def seller_dashboard():
     # Get subscription status for display
     subscription_status = user.get_subscription_status()
     
+    # Check for pending subscription
+    pending_request = SubscriptionRequest.query.filter_by(
+        seller_id=user.id, 
+        status='pending'
+    ).first()
+    
     return render_template('seller_dashboard.html', 
                          user=user, 
                          products=products,
-                         subscription_status=subscription_status)
+                         subscription_status=subscription_status,
+                         pending_request=pending_request)
 
 @app.route('/buyer/dashboard')
 def buyer_dashboard():
@@ -1165,6 +1225,9 @@ def admin_dashboard():
     # Get all users with their subscription status
     users = db.session.query(User).order_by(User.created_at.desc()).all()
     
+    # Get pending subscription requests
+    pending_requests = SubscriptionRequest.query.filter_by(status='pending').order_by(SubscriptionRequest.created_at.desc()).all()
+    
     # Process sellers' subscription status
     ending_soon = []
     for user in users:
@@ -1178,7 +1241,76 @@ def admin_dashboard():
     return render_template('admin_dashboard.html', 
                          users=users, 
                          ending_soon=ending_soon,
-                         datetime=datetime)
+                         pending_requests=pending_requests,
+                         datetime=datetime,
+                         get_payment_proof_url=get_payment_proof_url)
+
+# NEW: Admin subscription management routes
+@app.route('/admin/user/<int:user_id>/toggle-subscription', methods=['POST'])
+def admin_toggle_subscription(user_id):
+    if 'user_id' not in session or session.get('user_type') != 'admin':
+        abort(403)
+    
+    user = db.session.query(User).get_or_404(user_id)
+    
+    if user.user_type != 'seller':
+        flash('Only seller accounts have subscriptions.', 'error')
+        return redirect(url_for('admin_dashboard'))
+    
+    # Toggle subscription status
+    user.is_seller_active = not user.is_seller_active
+    
+    # If deactivating, also set subscription end date to now
+    if not user.is_seller_active:
+        user.subscription_end = datetime.now()
+        action = 'deactivated'
+        message_type = 'warning'
+    else:
+        # If reactivating, extend subscription by 30 days from now
+        user.subscription_end = datetime.now() + timedelta(days=30)
+        action = 'activated'
+        message_type = 'success'
+    
+    try:
+        db.session.commit()
+        flash(f'Subscription for {user.username} has been {action}.', message_type)
+    except Exception as e:
+        db.session.rollback()
+        flash('Error updating subscription status.', 'error')
+        print(f"Error toggling subscription: {e}")
+    
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/user/<int:user_id>/extend-subscription', methods=['POST'])
+def admin_extend_subscription(user_id):
+    if 'user_id' not in session or session.get('user_type') != 'admin':
+        abort(403)
+    
+    user = db.session.query(User).get_or_404(user_id)
+    
+    if user.user_type != 'seller':
+        flash('Only seller accounts have subscriptions.', 'error')
+        return redirect(url_for('admin_dashboard'))
+    
+    # Get extension days from form (default 30 days)
+    extension_days = request.form.get('extension_days', 30, type=int)
+    
+    # Calculate new end date
+    current_end_date = user.subscription_end or datetime.now()
+    new_end_date = current_end_date + timedelta(days=extension_days)
+    
+    user.subscription_end = new_end_date
+    user.is_seller_active = True
+    
+    try:
+        db.session.commit()
+        flash(f'Subscription for {user.username} extended by {extension_days} days. New end date: {new_end_date.strftime("%Y-%m-%d")}', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error extending subscription.', 'error')
+        print(f"Error extending subscription: {e}")
+    
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/user/<int:user_id>')
 def admin_view_user(user_id):
@@ -1187,9 +1319,11 @@ def admin_view_user(user_id):
     
     user = db.session.query(User).get_or_404(user_id)
     products = []
+    subscription_requests = []
     
     if user.user_type == 'seller':
         products = Product.query.filter_by(seller_id=user.id).all()
+        subscription_requests = SubscriptionRequest.query.filter_by(seller_id=user.id).order_by(SubscriptionRequest.created_at.desc()).all()
         
         # Ensure proper image URLs for products
         for product in products:
@@ -1201,7 +1335,9 @@ def admin_view_user(user_id):
     return render_template('admin_user_detail.html', 
                          user=user, 
                          products=products,
-                         datetime=datetime)
+                         subscription_requests=subscription_requests,
+                         datetime=datetime,
+                         get_payment_proof_url=get_payment_proof_url)
 
 @app.route('/admin/user/delete/<int:user_id>', methods=['POST'])
 def admin_delete_user(user_id):
@@ -1223,6 +1359,9 @@ def admin_delete_user(user_id):
                         os.remove(filepath)
             Product.query.filter_by(seller_id=user.id).delete()
         
+        # Delete subscription requests
+        SubscriptionRequest.query.filter_by(seller_id=user.id).delete()
+        
         db.session.delete(user)
         db.session.commit()
         flash(f'User {username} has been successfully deleted.', 'success')
@@ -1233,51 +1372,120 @@ def admin_delete_user(user_id):
     
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/seller/activate/<int:user_id>', methods=['POST'])
-def admin_activate_seller(user_id):
+@app.route('/admin/subscription-requests')
+def admin_subscription_requests():
     if 'user_id' not in session or session.get('user_type') != 'admin':
         abort(403)
     
-    seller = db.session.query(User).get_or_404(user_id)
-    if seller.user_type != 'seller':
-        abort(400)
+    pending_requests = SubscriptionRequest.query.filter_by(status='pending').order_by(SubscriptionRequest.created_at.desc()).all()
+    processed_requests = SubscriptionRequest.query.filter(SubscriptionRequest.status != 'pending').order_by(SubscriptionRequest.processed_at.desc()).limit(50).all()
+    
+    return render_template('admin_subscription_requests.html',
+                         pending_requests=pending_requests,
+                         processed_requests=processed_requests,
+                         datetime=datetime,
+                         get_payment_proof_url=get_payment_proof_url)
+
+@app.route('/admin/subscription-request/<int:request_id>/approve', methods=['POST'])
+def admin_approve_subscription(request_id):
+    if 'user_id' not in session or session.get('user_type') != 'admin':
+        abort(403)
+    
+    subscription_request = SubscriptionRequest.query.get_or_404(request_id)
+    seller = subscription_request.seller
+    
+    if subscription_request.status != 'pending':
+        flash('This subscription request has already been processed.', 'warning')
+        return redirect(url_for('admin_subscription_requests'))
     
     try:
-        days = int(request.form.get('days', 0))
-        payment_proof = request.form.get('payment_proof', '')
-        
-        if days <= 0:
-            flash('Invalid subscription period', 'danger')
-            return redirect(url_for('admin_view_user', user_id=user_id))
-        
-        now = datetime.now()
-        seller.subscription_start = now
-        seller.subscription_end = now + timedelta(days=days)
+        # Activate seller subscription
         seller.is_seller_active = True
-        seller.last_payment_proof = payment_proof
+        seller.subscription_start = datetime.now()
+        seller.subscription_end = datetime.now() + timedelta(days=subscription_request.subscription_days)
+        seller.last_payment_proof = subscription_request.payment_proof_filename
+        seller.has_pending_subscription = False
+        
+        # Update subscription request
+        subscription_request.status = 'approved'
+        subscription_request.processed_at = datetime.now()
+        subscription_request.processed_by = session['user_id']
+        subscription_request.notes = request.form.get('notes', '')
         
         db.session.commit()
         
-        # Send notification email asynchronously
+        # Send notification email to seller
         try:
             body = f'''Hello {seller.username},
-            
-Your subscription has been activated for {days} days (until {seller.subscription_end.strftime('%B %d, %Y')}).
+
+Your subscription request has been approved!
+Your seller account is now active for {subscription_request.subscription_days} days (until {seller.subscription_end.strftime('%B %d, %Y')}).
+
 You can now publish your products on Burundian Market.
 
 Thank you for using our service!
 '''
-            send_notification_email(seller.email, 'Your Subscription Has Been Activated', body)
+            send_notification_email(seller.email, 'Your Subscription Has Been Approved', body)
         except Exception as e:
             print(f"Error sending email to {seller.email}: {str(e)}")
         
-        flash('Seller subscription activated successfully!', 'success')
+        flash(f'Subscription approved for {seller.username}! Account activated for {subscription_request.subscription_days} days.', 'success')
+        
     except Exception as e:
         db.session.rollback()
-        print(f"Error activating seller subscription: {str(e)}")
-        flash('Error activating subscription. Please try again.', 'danger')
+        print(f"Error approving subscription: {str(e)}")
+        flash('Error approving subscription. Please try again.', 'danger')
     
-    return redirect(url_for('admin_view_user', user_id=user_id))
+    return redirect(url_for('admin_subscription_requests'))
+
+@app.route('/admin/subscription-request/<int:request_id>/reject', methods=['POST'])
+def admin_reject_subscription(request_id):
+    if 'user_id' not in session or session.get('user_type') != 'admin':
+        abort(403)
+    
+    subscription_request = SubscriptionRequest.query.get_or_404(request_id)
+    seller = subscription_request.seller
+    
+    if subscription_request.status != 'pending':
+        flash('This subscription request has already been processed.', 'warning')
+        return redirect(url_for('admin_subscription_requests'))
+    
+    try:
+        # Update subscription request
+        subscription_request.status = 'rejected'
+        subscription_request.processed_at = datetime.now()
+        subscription_request.processed_by = session['user_id']
+        subscription_request.notes = request.form.get('notes', 'Payment proof not valid or insufficient.')
+        
+        # Update seller status
+        seller.has_pending_subscription = False
+        
+        db.session.commit()
+        
+        # Send notification email to seller
+        try:
+            body = f'''Hello {seller.username},
+
+Your subscription request has been reviewed but we couldn't approve it at this time.
+
+Reason: {subscription_request.notes}
+
+Please check your payment proof and submit a new request if needed.
+
+Thank you for using Burundian Market!
+'''
+            send_notification_email(seller.email, 'Subscription Request Update', body)
+        except Exception as e:
+            print(f"Error sending email to {seller.email}: {str(e)}")
+        
+        flash(f'Subscription request rejected for {seller.username}.', 'warning')
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error rejecting subscription: {str(e)}")
+        flash('Error rejecting subscription. Please try again.', 'danger')
+    
+    return redirect(url_for('admin_subscription_requests'))
 
 @app.route('/admin/user/message/<int:user_id>', methods=['GET', 'POST'])
 def admin_send_message(user_id):
@@ -1314,7 +1522,17 @@ def seller_subscribe():
     
     user = db.session.query(User).get(session['user_id'])
     subscription_status = user.get_subscription_status()
-    return render_template('seller_subscribe.html', user=user, subscription_status=subscription_status)
+    
+    # Check for pending subscription
+    pending_request = SubscriptionRequest.query.filter_by(
+        seller_id=user.id, 
+        status='pending'
+    ).first()
+    
+    return render_template('seller_subscribe.html', 
+                         user=user, 
+                         subscription_status=subscription_status,
+                         pending_request=pending_request)
 
 # Process Subscription Choice
 @app.route('/seller/choose-subscription', methods=['POST'])
@@ -1341,6 +1559,79 @@ def choose_subscription():
                          period=period,
                          amount=periods[period],
                          days=period)
+
+# NEW: Submit subscription with payment proof
+@app.route('/seller/submit-subscription', methods=['POST'])
+def submit_subscription():
+    if 'user_id' not in session or session.get('user_type') != 'seller':
+        return redirect(url_for('login'))
+    
+    user = db.session.query(User).get(session['user_id'])
+    period = request.form.get('period')
+    periods = {
+        '30': 15000,
+        '60': 30000,
+        '120': 60000,
+        '180': 75000,
+        '250': 90000,
+        '300': 120000,
+        '365': 155000
+    }
+    
+    if period not in periods:
+        flash('Invalid subscription period selected', 'danger')
+        return redirect(url_for('seller_subscribe'))
+    
+    # Check if user already has a pending subscription
+    existing_pending = SubscriptionRequest.query.filter_by(
+        seller_id=user.id, 
+        status='pending'
+    ).first()
+    
+    if existing_pending:
+        flash('You already have a pending subscription request. Please wait for admin approval.', 'warning')
+        return redirect(url_for('seller_subscribe'))
+    
+    # Handle payment proof upload
+    payment_proof = request.files.get('payment_proof')
+    if not payment_proof or payment_proof.filename == '':
+        flash('Please upload your payment proof (borderaux)', 'danger')
+        return redirect(url_for('seller_subscribe'))
+    
+    # Save payment proof
+    payment_proof_filename = save_image_file(payment_proof, 'payment_proofs')
+    if not payment_proof_filename:
+        return redirect(url_for('seller_subscribe'))
+    
+    try:
+        # Create subscription request
+        subscription_request = SubscriptionRequest(
+            seller_id=user.id,
+            subscription_days=int(period),
+            amount=periods[period],
+            payment_proof_filename=payment_proof_filename,
+            status='pending'
+        )
+        
+        # Update user pending status
+        user.has_pending_subscription = True
+        user.pending_subscription_days = int(period)
+        user.pending_payment_proof = payment_proof_filename
+        
+        db.session.add(subscription_request)
+        db.session.commit()
+        
+        # Notify admin (you can add email notification to admin here)
+        print(f"📢 NEW SUBSCRIPTION REQUEST: {user.username} requested {period} days subscription")
+        
+        flash('Subscription request submitted successfully! Please wait for admin approval (usually within 24 hours).', 'success')
+        return redirect(url_for('seller_dashboard'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error submitting subscription: {str(e)}")
+        flash('Error submitting subscription request. Please try again.', 'danger')
+        return redirect(url_for('seller_subscribe'))
 
 # Convert base64 images to files
 @app.route('/convert-all-images')
@@ -1403,8 +1694,10 @@ def check_seller_subscription():
         elif not user.is_seller_active and user.subscription_end and user.subscription_end < datetime.now():
             notify_subscription_status(user, 'subscription_ended')
         
-        # Redirect to subscription page if not active
-        if not user.is_seller_active and request.endpoint not in ['seller_subscribe', 'choose_subscription', 'logout', 'static', 'edit_profile']:
+        # Redirect to subscription page if not active and no pending request
+        if (not user.is_seller_active and 
+            not user.has_pending_subscription and
+            request.endpoint not in ['seller_subscribe', 'choose_subscription', 'submit_subscription', 'logout', 'static', 'edit_profile']):
             flash('Your seller account is not active. Please subscribe to continue.', 'warning')
             return redirect(url_for('seller_subscribe'))
             
@@ -1470,6 +1763,36 @@ def keepalive():
 @app.route('/terms')
 def terms():
     return render_template('terms.html', now=datetime.now())
+
+
+@app.template_filter('timesince')
+def timesince(dt, default="just now"):
+    """
+    Returns string representing "time since" e.g.
+    3 days ago, 5 hours ago etc.
+    """
+    if dt is None:
+        return default
+    
+    now = datetime.now()
+    diff = now - dt
+    
+    periods = (
+        (diff.days // 365, "year", "years"),
+        (diff.days // 30, "month", "months"),
+        (diff.days // 7, "week", "weeks"),
+        (diff.days, "day", "days"),
+        (diff.seconds // 3600, "hour", "hours"),
+        (diff.seconds // 60, "minute", "minutes"),
+        (diff.seconds, "second", "seconds"),
+    )
+    
+    for period, singular, plural in periods:
+        if period:
+            return "%d %s ago" % (period, singular if period == 1 else plural)
+    
+    return default
+
 
 if __name__ == '__main__':
     app.run(debug=True)

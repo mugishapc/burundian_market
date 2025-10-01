@@ -4,81 +4,206 @@
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-md-10">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h3 class="text-center">Seller Subscription</h3>
                 </div>
                 <div class="card-body">
+                    <!-- Pending Subscription Alert -->
+                    {% if pending_request %}
+                    <div class="alert alert-info">
+                        <h4 class="alert-heading"><i class="fas fa-clock me-2"></i>Subscription Request Pending</h4>
+                        <p>Your subscription request for <strong>{{ pending_request.subscription_days }} days</strong> is currently under review.</p>
+                        <p class="mb-0">Submitted on: {{ pending_request.created_at.strftime('%Y-%m-%d at %H:%M') }}</p>
+                        <p class="mb-0">Status: <span class="badge bg-warning">Pending Approval</span></p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Active Subscription Status -->
                     {% if user.is_seller_active %}
                     <div class="alert alert-success">
-                        <h4 class="alert-heading">Your account is active!</h4>
+                        <h4 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Your account is active!</h4>
                         {% if user.subscription_end %}
-                            <p>Your subscription ends on: {{ user.subscription_end.strftime('%Y-%m-%d') }}</p>
+                            <p>Your subscription ends on: <strong>{{ user.subscription_end.strftime('%Y-%m-%d') }}</strong></p>
+                            <p class="mb-0">Days remaining: <span class="badge bg-success">{{ subscription_status.days_left }} days</span></p>
                         {% else %}
-                            <p>You are currently in your 5-day trial period.</p>
+                            <p>You are currently in your <strong>5-day trial period</strong>.</p>
+                            <p class="mb-0">Trial ends in: <span class="badge bg-warning">{{ subscription_status.days_left }} days</span></p>
                         {% endif %}
                     </div>
                     {% else %}
+                    <!-- Inactive Account -->
                     <div class="alert alert-danger">
-                        <h4 class="alert-heading">Your seller account is not active</h4>
+                        <h4 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Your seller account is not active</h4>
                         <p>To continue publishing products, please choose a subscription plan below.</p>
                     </div>
-                    
-                    <h4 class="mt-4">Choose Subscription Plan</h4>
-                    <form method="POST" action="{{ url_for('choose_subscription') }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="row row-cols-1 row-cols-md-2 g-4 mt-2">
-                            <div class="col">
-                                <div class="card h-100">
-                                    <div class="card-header bg-success text-white">
-                                        <h5 class="text-center">30 Days</h5>
-                                    </div>
-                                    <div class="card-body text-center">
-                                        <h3 class="card-title">15,000 BIF</h3>
-                                        <button type="submit" name="period" value="30" class="btn btn-primary mt-3">Choose Plan</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col">
-                                <div class="card h-100">
-                                    <div class="card-header bg-info text-white">
-                                        <h5 class="text-center">60 Days</h5>
-                                    </div>
-                                    <div class="card-body text-center">
-                                        <h3 class="card-title">30,000 BIF</h3>
-                                        <button type="submit" name="period" value="60" class="btn btn-primary mt-3">Choose Plan</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col">
-                                <div class="card h-100">
-                                    <div class="card-header bg-warning text-dark">
-                                        <h5 class="text-center">120 Days</h5>
-                                    </div>
-                                    <div class="card-body text-center">
-                                        <h3 class="card-title">60,000 BIF</h3>
-                                        <button type="submit" name="period" value="120" class="btn btn-primary mt-3">Choose Plan</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col">
-                                <div class="card h-100">
-                                    <div class="card-header bg-danger text-white">
-                                        <h5 class="text-center">180 Days</h5>
-                                    </div>
-                                    <div class="card-body text-center">
-                                        <h3 class="card-title">75,000 BIF</h3>
-                                        <button type="submit" name="period" value="180" class="btn btn-primary mt-3">Choose Plan</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
                     {% endif %}
+                    
+                    <!-- Subscription Plans -->
+                    {% if not user.is_seller_active or subscription_status.days_left <= 10 %}
+                    <div class="mt-4">
+                        <h4 class="text-center mb-4">Choose Subscription Plan</h4>
+                        
+                        {% if not pending_request %}
+                        <form method="POST" action="{{ url_for('choose_subscription') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                                <!-- 30 Days -->
+                                <div class="col">
+                                    <div class="card h-100 subscription-card">
+                                        <div class="card-header bg-success text-white text-center">
+                                            <h5 class="mb-0">30 Days</h5>
+                                        </div>
+                                        <div class="card-body text-center">
+                                            <h3 class="card-title text-primary">15,000 BIF</h3>
+                                            <p class="text-muted">Perfect for testing</p>
+                                            <button type="submit" name="period" value="30" class="btn btn-success w-100">
+                                                Choose Plan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 60 Days -->
+                                <div class="col">
+                                    <div class="card h-100 subscription-card">
+                                        <div class="card-header bg-info text-white text-center">
+                                            <h5 class="mb-0">60 Days</h5>
+                                        </div>
+                                        <div class="card-body text-center">
+                                            <h3 class="card-title text-primary">30,000 BIF</h3>
+                                            <p class="text-muted">Good value</p>
+                                            <button type="submit" name="period" value="60" class="btn btn-info text-white w-100">
+                                                Choose Plan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 120 Days -->
+                                <div class="col">
+                                    <div class="card h-100 subscription-card">
+                                        <div class="card-header bg-warning text-dark text-center">
+                                            <h5 class="mb-0">120 Days</h5>
+                                        </div>
+                                        <div class="card-body text-center">
+                                            <h3 class="card-title text-primary">60,000 BIF</h3>
+                                            <p class="text-muted">Popular choice</p>
+                                            <button type="submit" name="period" value="120" class="btn btn-warning w-100">
+                                                Choose Plan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 180 Days -->
+                                <div class="col">
+                                    <div class="card h-100 subscription-card">
+                                        <div class="card-header bg-primary text-white text-center">
+                                            <h5 class="mb-0">180 Days</h5>
+                                        </div>
+                                        <div class="card-body text-center">
+                                            <h3 class="card-title text-primary">75,000 BIF</h3>
+                                            <p class="text-muted">Better savings</p>
+                                            <button type="submit" name="period" value="180" class="btn btn-primary w-100">
+                                                Choose Plan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 250 Days -->
+                                <div class="col">
+                                    <div class="card h-100 subscription-card">
+                                        <div class="card-header bg-secondary text-white text-center">
+                                            <h5 class="mb-0">250 Days</h5>
+                                        </div>
+                                        <div class="card-body text-center">
+                                            <h3 class="card-title text-primary">90,000 BIF</h3>
+                                            <p class="text-muted">Great value</p>
+                                            <button type="submit" name="period" value="250" class="btn btn-secondary w-100">
+                                                Choose Plan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 300 Days -->
+                                <div class="col">
+                                    <div class="card h-100 subscription-card">
+                                        <div class="card-header bg-dark text-white text-center">
+                                            <h5 class="mb-0">300 Days</h5>
+                                        </div>
+                                        <div class="card-body text-center">
+                                            <h3 class="card-title text-primary">120,000 BIF</h3>
+                                            <p class="text-muted">Best for serious sellers</p>
+                                            <button type="submit" name="period" value="300" class="btn btn-dark w-100">
+                                                Choose Plan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 365 Days -->
+                                <div class="col">
+                                    <div class="card h-100 subscription-card">
+                                        <div class="card-header bg-danger text-white text-center">
+                                            <h5 class="mb-0">365 Days</h5>
+                                        </div>
+                                        <div class="card-body text-center">
+                                            <h3 class="card-title text-primary">155,000 BIF</h3>
+                                            <p class="text-muted">Annual commitment</p>
+                                            <button type="submit" name="period" value="365" class="btn btn-danger w-100">
+                                                Choose Plan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Additional Information -->
+                    <div class="mt-5">
+                        <div class="alert alert-light border">
+                            <h5><i class="fas fa-info-circle me-2 text-primary"></i>How it works:</h5>
+                            <ol class="mb-0">
+                                <li>Choose your subscription plan</li>
+                                <li>Make payment to the provided bank account</li>
+                                <li>Upload your payment proof (borderaux)</li>
+                                <li>Wait for admin approval (usually within 24 hours)</li>
+                                <li>Start selling immediately after approval</li>
+                            </ol>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.subscription-card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    border: 2px solid transparent;
+}
+
+.subscription-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    border-color: #007bff;
+}
+
+.subscription-card .card-header {
+    font-weight: 600;
+}
+
+.subscription-card .card-title {
+    font-weight: 700;
+    margin: 15px 0;
+}
+</style>
 {% endblock %}
