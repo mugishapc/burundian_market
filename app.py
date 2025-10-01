@@ -17,6 +17,7 @@ import base64
 import io
 from PIL import Image
 from flask import flash
+from werkzeug.utils import secure_filename
 
 
 # Load environment variables first
@@ -33,6 +34,14 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_recycle': 300,
     'pool_pre_ping': True
 }
+
+# File-based image storage configuration
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 # Email Configuration with timeout
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -220,6 +229,10 @@ def initialize_database():
                     print("✅ Admin user created")
                 except Exception as e:
                     print(f"⚠️  Could not create admin user: {e}")
+            
+            # Create uploads directory
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            print("✅ Uploads directory created")
             
             print("🎉 Database initialized successfully!")
             
@@ -432,35 +445,91 @@ def startup_tasks():
         check_all_subscriptions()
         startup_done = True
 
-# NEW: Function to process and store images as base64
-def process_image(image_file):
-    """Process uploaded image and return base64 data"""
+# FILE-BASED IMAGE HANDLING FUNCTIONS
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def save_image_file(image_file):
+    """Save image as file and return filename"""
     if not image_file or image_file.filename == '':
-        return None, None
+        return None
+    
+    if not allowed_file(image_file.filename):
+        flash('Invalid file type. Please upload PNG, JPG, JPEG, GIF, or WEBP images.', 'danger')
+        return None
     
     try:
-        # Read image file
-        image_data = image_file.read()
+        # Check file size
+        image_file.seek(0, 2)  # Seek to end
+        file_size = image_file.tell()
+        image_file.seek(0)  # Reset to beginning
         
-        # Convert to base64
-        base64_data = base64.b64encode(image_data).decode('utf-8')
+        if file_size > MAX_FILE_SIZE:
+            flash('Image file is too large. Maximum size is 5MB.', 'danger')
+            return None
         
-        # Get filename
-        filename = image_file.filename
+        # Generate secure filename
+        filename = secure_filename(image_file.filename)
+        # Add timestamp to make filename unique
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_")
+        filename = timestamp + filename
         
-        return base64_data, filename
+        # Save file
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        image_file.save(filepath)
+        
+        print(f"✅ Image saved as file: {filename}")
+        return filename
+        
     except Exception as e:
-        print(f"Error processing image: {e}")
-        return None, None
+        print(f"❌ Error saving image file: {e}")
+        flash('Error saving image file. Please try again.', 'danger')
+        return None
 
-# NEW: Function to get image URL for templates
 def get_image_url(product):
-    """Get image URL for product - uses base64 data URL"""
-    if not product.image_data:
-        return url_for('static', filename='images/placeholder.jpg')
+    """Get image URL for product - uses file path"""
+    if not product or not product.image_filename:
+        return None
     
-    # Return base64 data URL
-    return f"data:image/jpeg;base64,{product.image_data}"
+    image_url = url_for('static', filename=f'uploads/{product.image_filename}')
+    return image_url
+
+def convert_base64_to_file(product):
+    """Convert base64 image data to file storage"""
+    if not product or not product.image_data:
+        return False
+    
+    try:
+        # Decode base64 data
+        image_bytes = base64.b64decode(product.image_data)
+        
+        # Generate filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        extension = 'jpg'  # default
+        if product.image_filename:
+            ext = product.image_filename.lower().split('.')[-1]
+            if ext in ALLOWED_EXTENSIONS:
+                extension = ext
+        
+        filename = f"{timestamp}_{product.id}.{extension}"
+        filename = secure_filename(filename)
+        
+        # Save file
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        with open(filepath, 'wb') as f:
+            f.write(image_bytes)
+        
+        # Update product
+        product.image_filename = filename
+        product.image_data = None  # Remove base64 data
+        
+        print(f"✅ Converted base64 to file: {product.title} -> {filename}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error converting base64 to file for {product.title}: {e}")
+        return False
 
 # Routes
 @app.route('/')
@@ -829,21 +898,31 @@ def add_product():
         price = float(request.form['price'])
         category = request.form.get('category')
         
-        # Handle image upload - store as base64 in database
+        # Handle image upload - store as FILE
         image = request.files.get('image')
-        image_data = None
         image_filename = None
         
         if image and image.filename != '':
-            image_data, image_filename = process_image(image)
+            image_filename = save_image_file(image)
+            if not image_filename:
+                return redirect(url_for('add_product'))
+        
+        # Validate required fields
+        if not title or not price:
+            flash('Title and price are required fields.', 'danger')
+            return redirect(url_for('add_product'))
+        
+        if price <= 0:
+            flash('Price must be greater than 0.', 'danger')
+            return redirect(url_for('add_product'))
         
         new_product = Product(
             title=title,
             description=description,
             price=price,
             category=category,
-            image_data=image_data,
-            image_filename=image_filename,
+            image_data=None,  # Don't store base64
+            image_filename=image_filename,  # Store filename
             seller_id=session['user_id']
         )
         
@@ -901,7 +980,7 @@ def forgot_password():
                 # Email failed, show manual instructions
                 reset_url = url_for('reset_password', token=token, _external=True)
                 flash(f'Email service temporarily unavailable. Please use this link to reset your password: {reset_url}', 'warning')
-                return render_template('reset_link_display.html', reset_url=reset_url)
+                return render_template('reset_link_display.html', reset_url=reset_url, email=email)
         else:
             # Always show the same message for security
             flash('If an account exists with that email, a password reset link has been sent.', 'info')
@@ -1035,10 +1114,18 @@ def edit_product(product_id):
         # Handle image update
         image = request.files.get('image')
         if image and image.filename != '':
-            image_data, image_filename = process_image(image)
-            if image_data:
-                product.image_data = image_data
+            image_filename = save_image_file(image)
+            if image_filename:
+                # Delete old image file if exists
+                if product.image_filename:
+                    old_filepath = os.path.join(app.config['UPLOAD_FOLDER'], product.image_filename)
+                    if os.path.exists(old_filepath):
+                        os.remove(old_filepath)
+                
                 product.image_filename = image_filename
+                product.image_data = None  # Ensure no base64 data
+            else:
+                return redirect(url_for('edit_product', product_id=product_id))
         
         db.session.commit()
         flash('Product updated successfully!', 'success')
@@ -1057,6 +1144,12 @@ def delete_product(product_id):
     product = db.session.query(Product).get_or_404(product_id)
     if product.seller_id != session['user_id']:
         abort(403)  # Forbidden for other sellers
+    
+    # Delete image file if exists
+    if product.image_filename:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], product.image_filename)
+        if os.path.exists(filepath):
+            os.remove(filepath)
     
     db.session.delete(product)
     db.session.commit()
@@ -1119,8 +1212,15 @@ def admin_delete_user(user_id):
     username = user.username
     
     try:
-        # Delete user's products if they're a seller
+        # Delete user's products first (if seller)
         if user.user_type == 'seller':
+            products = Product.query.filter_by(seller_id=user.id).all()
+            for product in products:
+                # Delete image files
+                if product.image_filename:
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], product.image_filename)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
             Product.query.filter_by(seller_id=user.id).delete()
         
         db.session.delete(user)
@@ -1242,6 +1342,29 @@ def choose_subscription():
                          amount=periods[period],
                          days=period)
 
+# Convert base64 images to files
+@app.route('/convert-all-images')
+def convert_all_images():
+    if 'user_id' not in session or session.get('user_type') != 'seller':
+        return redirect(url_for('login'))
+    
+    user = db.session.query(User).get(session['user_id'])
+    products = Product.query.filter_by(seller_id=user.id).all()
+    
+    converted_count = 0
+    for product in products:
+        if product.image_data and not product.image_filename:
+            if convert_base64_to_file(product):
+                converted_count += 1
+    
+    if converted_count > 0:
+        db.session.commit()
+        flash(f'Converted {converted_count} images from base64 to files!', 'success')
+    else:
+        flash('No base64 images found to convert.', 'info')
+    
+    return redirect(url_for('seller_dashboard'))
+
 # Middleware to check seller subscription status
 @app.before_request
 def check_seller_subscription():
@@ -1343,14 +1466,6 @@ def keepalive():
             db.session.commit()
             return {'status': 'active'}, 200
     return {'status': 'inactive'}, 401
-
-@app.route('/checksession')
-def check_session():
-    if 'user_id' in session:
-        user = db.session.query(User).get(session['user_id'])
-        if user and (datetime.utcnow() - user.last_activity).total_seconds() < 3600:  # 1 hour
-            return {'status': 'active'}, 200
-    return {'status': 'expired'}, 401
 
 @app.route('/terms')
 def terms():

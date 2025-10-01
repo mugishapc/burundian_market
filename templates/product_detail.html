@@ -6,19 +6,20 @@
     <div class="col-md-6">
         {% if product.image_url %}
             <img src="{{ product.image_url }}" 
-                 class="img-fluid rounded" 
+                 class="img-fluid rounded product-image" 
                  alt="{{ product.title }}"
                  style="max-height: 500px; object-fit: contain;"
-                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
+                 loading="eager"
+                 onerror="console.log('Image failed to load'); this.style.display='none'; document.getElementById('no-image-fallback').style.display='flex';">
+            <div id="no-image-fallback" class="no-image" style="height: 300px; width: 100%; display: none;">
         {% else %}
-            <div class="bg-secondary d-flex align-items-center justify-content-center rounded" 
-                 style="height: 300px; width: 100%;">
-                <div class="text-center text-white">
-                    <i class="fas fa-image fa-3x mb-3"></i>
-                    <p class="mb-0">No Image Available</p>
+            <div id="no-image-fallback" class="no-image" style="height: 300px; width: 100%;">
+        {% endif %}
+                <div class="text-center">
+                    <i class="fas fa-camera fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-0">No Image Available</p>
                 </div>
             </div>
-        {% endif %}
     </div>
     <div class="col-md-6">
         <h2>{{ product.title }}</h2>
@@ -82,15 +83,15 @@
                 <a href="{{ url_for('product_detail', product_id=similar.id) }}">
                     {% if similar.image_url %}
                     <img src="{{ similar.image_url }}" 
-                         class="card-img-top" 
+                         class="card-img-top product-image" 
                          alt="{{ similar.title }}"
                          style="height: 200px; object-fit: cover;"
-                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
-                    {% else %}
-                    <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="height: 200px;">
-                        <i class="fas fa-image text-white fa-2x"></i>
-                    </div>
+                         loading="eager"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                     {% endif %}
+                    <div class="no-image" style="height: 200px; {% if similar.image_url %}display: none;{% else %}display: flex;{% endif %}">
+                        <i class="fas fa-camera text-muted fa-2x"></i>
+                    </div>
                 </a>
                 <div class="card-body">
                     <h5 class="card-title">
@@ -106,4 +107,45 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+// Enhanced image handling for product detail page
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Product detail page loaded');
+    
+    const mainImage = document.querySelector('.product-image');
+    if (mainImage && mainImage.src.includes('data:image')) {
+        console.log('Main product image found, forcing reload...');
+        
+        // Force reload main product image
+        setTimeout(() => {
+            const originalSrc = mainImage.src.split('?')[0];
+            mainImage.src = originalSrc + '?reload=' + new Date().getTime();
+        }, 100);
+        
+        // Add error handling
+        mainImage.addEventListener('error', function() {
+            console.log('Main product image failed to load, showing fallback');
+            this.style.display = 'none';
+            document.getElementById('no-image-fallback').style.display = 'flex';
+        });
+        
+        mainImage.addEventListener('load', function() {
+            console.log('Main product image loaded successfully');
+        });
+    } else {
+        console.log('No product image found or not base64 image');
+    }
+    
+    // Handle similar product images
+    document.querySelectorAll('.card-img-top.product-image').forEach(img => {
+        if (img.src.includes('data:image')) {
+            setTimeout(() => {
+                const originalSrc = img.src.split('?')[0];
+                img.src = originalSrc + '?reload=' + new Date().getTime();
+            }, 300);
+        }
+    });
+});
+</script>
 {% endblock %}

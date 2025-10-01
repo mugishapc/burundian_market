@@ -15,21 +15,21 @@
     <div class="row">
         {% for product in products %}
         <div class="col-md-3 mb-4">
-            <div class="card h-100">
+            <div class="card h-100 product-card">
                 {% if product.image_url %}
                     <img src="{{ product.image_url }}" 
                          class="card-img-top product-image" 
                          alt="{{ product.title }}"
                          style="height: 200px; object-fit: cover;"
-                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
-                {% else %}
-                    <div class="image-placeholder card-img-top d-flex align-items-center justify-content-center">
-                        <div class="text-center">
-                            <i class="fas fa-image fa-2x text-muted mb-2"></i>
-                            <p class="text-muted mb-0">No Image</p>
-                        </div>
-                    </div>
+                         loading="eager"
+                         onerror="console.log('Home page image error for {{ product.title }}'); this.style.display='none'; this.nextElementSibling.style.display='flex';">
                 {% endif %}
+                <div class="no-image" style="height: 200px; {% if product.image_url %}display: none;{% else %}display: flex;{% endif %}">
+                    <div class="text-center">
+                        <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">No Image</p>
+                    </div>
+                </div>
                 <div class="card-body">
                     <h5 class="card-title">{{ product.title }}</h5>
                     <p class="card-text text-success fw-bold">{{ product.price }} BIF</p>
@@ -40,4 +40,67 @@
         {% endfor %}
     </div>
 </div>
+
+<script>
+// Additional image handling for home page
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Home page loaded - initializing image handling');
+    
+    // Force load all product images immediately
+    const productImages = document.querySelectorAll('.product-card .product-image');
+    console.log(`Found ${productImages.length} product images on home page`);
+    
+    productImages.forEach((img, index) => {
+        if (img.src && img.src.includes('data:image')) {
+            console.log(`Loading home page image ${index + 1}: ${img.alt}`);
+            
+            // Create new image object to force load
+            const newImg = new Image();
+            newImg.src = img.src;
+            
+            newImg.onload = function() {
+                console.log(`✅ Home page image loaded: ${img.alt}`);
+                // Ensure the image is visible
+                img.style.display = 'block';
+                // Hide fallback if it exists
+                const fallback = img.nextElementSibling;
+                if (fallback && fallback.classList.contains('no-image')) {
+                    fallback.style.display = 'none';
+                }
+            };
+            
+            newImg.onerror = function() {
+                console.log(`❌ Home page image failed: ${img.alt}`);
+                // Hide failed image and show fallback
+                img.style.display = 'none';
+                const fallback = img.nextElementSibling;
+                if (fallback && fallback.classList.contains('no-image')) {
+                    fallback.style.display = 'flex';
+                }
+            };
+            
+            // Force reload with timestamp
+            setTimeout(() => {
+                const originalSrc = img.src.split('?')[0];
+                img.src = originalSrc + '?home_reload=' + new Date().getTime();
+            }, 200 * (index + 1));
+        }
+    });
+});
+</script>
+
+<style>
+.product-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.product-image {
+    background-color: #f8f9fa;
+}
+</style>
 {% endblock %}

@@ -1,131 +1,174 @@
 {% extends "base.html" %}
-{% block title %}Edit Product - {{ product.title }}{% endblock %}
+{% block title %}Edit Product{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h3 class="mb-0">Edit Product</h3>
-                        <a href="{{ url_for('seller_dashboard') }}" class="btn btn-sm btn-light">
-                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h4 class="card-title mb-0"><i class="fas fa-edit me-2"></i>Edit Product</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Product Title *</label>
+                        <input type="text" class="form-control" id="title" name="title" 
+                               value="{{ product.title }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" 
+                                  rows="4">{{ product.description }}</textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="price" class="form-label">Price (BIF) *</label>
+                                <input type="number" class="form-control" id="price" name="price" 
+                                       value="{{ product.price }}" step="0.01" min="0" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="category" class="form-label">Category</label>
+                                <input type="text" class="form-control" id="category" name="category" 
+                                       value="{{ product.category or '' }}" 
+                                       placeholder="e.g., Electronics, Clothing, Food">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Image -->
+                    <div class="mb-3">
+                        <label class="form-label">Current Image</label>
+                        {% if product.image_url %}
+                        <div class="border rounded p-3 text-center">
+                            <img src="{{ product.image_url }}" alt="{{ product.title }}" 
+                                 style="max-height: 200px; max-width: 100%;">
+                            <p class="mt-2 mb-0 text-muted">Current product image</p>
+                        </div>
+                        {% else %}
+                        <div class="border rounded p-3 text-center bg-light">
+                            <i class="fas fa-image fa-2x text-muted mb-2"></i>
+                            <p class="mt-2 mb-0 text-muted">No image currently</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- New Image Upload -->
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Update Image</label>
+                        <input type="file" class="form-control" id="image" name="image" 
+                               accept=".jpg,.jpeg,.png,.gif,.webp">
+                        <div class="form-text">
+                            Leave empty to keep current image. Supported formats: JPG, JPEG, PNG, GIF, WEBP. Max size: 5MB.
+                        </div>
+                    </div>
+                    
+                    <!-- New Image Preview -->
+                    <div class="mb-3" id="image-preview-container" style="display: none;">
+                        <label class="form-label">New Image Preview</label>
+                        <div class="border rounded p-3 text-center">
+                            <img id="image-preview" src="#" alt="Preview" 
+                                 style="max-height: 200px; max-width: 100%; display: none;">
+                            <div id="no-preview" class="text-muted">
+                                <i class="fas fa-image fa-2x mb-2"></i>
+                                <p class="mb-0">New image preview will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-warning btn-lg">
+                            <i class="fas fa-save me-2"></i>Update Product
+                        </button>
+                        <a href="{{ url_for('seller_dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
                         </a>
                     </div>
-                </div>
-                
-                <div class="card-body">
-                    <form method="POST" action="{{ url_for('edit_product', product_id=product.id) }}" enctype="multipart/form-data" novalidate>
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        
-                        <div class="mb-3">
-                            <label for="title" class="form-label">Product Title *</label>
-                            <input type="text" class="form-control" id="title" name="title" 
-                                   value="{{ product.title }}" required>
-                            <div class="invalid-feedback">
-                                Please provide a product title.
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="description" class="form-label">Description *</label>
-                            <textarea class="form-control" id="description" name="description" 
-                                      rows="5" required>{{ product.description }}</textarea>
-                            <div class="invalid-feedback">
-                                Please provide a product description.
-                            </div>
-                        </div>
-                        
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="price" class="form-label">Price (BIF) *</label>
-                                <div class="input-group">
-                                    <input type="number" step="0.01" class="form-control" id="price" 
-                                           name="price" value="{{ '%.2f' % product.price }}" required>
-                                    <span class="input-group-text">BIF</span>
-                                    <div class="invalid-feedback">
-                                        Please provide a valid price.
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <label for="category" class="form-label">Category *</label>
-                                <select class="form-select" id="category" name="category" required>
-                                    <option value="" disabled>Select a category</option>
-                                    <option value="Electronics" {% if product.category == 'Electronics' %}selected{% endif %}>Electronics</option>
-                                    <option value="Clothing" {% if product.category == 'Clothing' %}selected{% endif %}>Clothing</option>
-                                    <option value="Books" {% if product.category == 'Books' %}selected{% endif %}>Books</option>
-                                    <option value="Groceries" {% if product.category == 'Groceries' %}selected{% endif %}>Groceries</option>
-                                    <option value="Furniture" {% if product.category == 'Furniture' %}selected{% endif %}>Furniture</option>
-                                    <option value="Other" {% if product.category == 'Other' %}selected{% endif %}>Other</option>
-                                </select>
-                                <div class="invalid-feedback">
-                                    Please select a category.
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-4 mt-3">
-                            <label for="image" class="form-label">Product Image</label>
-                            <input class="form-control" type="file" id="image" name="image" accept="image/*">
-                            <div class="form-text">
-                                JPG, PNG or GIF (Max 2MB). Leave blank to keep current image.
-                            </div>
-                            
-                            {% if product.image %}
-                            <div class="mt-3 text-center">
-                                <h6>Current Image:</h6>
-                                <img src="{{ url_for('static', filename=product.image) }}" 
-                                     class="img-thumbnail" 
-                                     style="max-height: 200px;"
-                                     alt="{{ product.title }}">
-                                <div class="form-check mt-2">
-                                    <input class="form-check-input" type="checkbox" id="remove_image" name="remove_image">
-                                    <label class="form-check-label" for="remove_image">
-                                        Remove current image
-                                    </label>
-                                </div>
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <button type="submit" class="btn btn-primary px-4">
-                                <i class="fas fa-save me-2"></i>Update Product
-                            </button>
-                            <a href="{{ url_for('seller_dashboard') }}" class="btn btn-outline-secondary px-4">
-                                Cancel
-                            </a>
-                        </div>
-                    </form>
-                </div>
+                </form>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-// Client-side form validation
-(function () {
-    'use strict'
+document.addEventListener('DOMContentLoaded', function() {
+    const imageInput = document.getElementById('image');
+    const previewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const noPreview = document.getElementById('no-preview');
     
-    // Fetch all the forms we want to apply custom Bootstrap validation styles to
-    var forms = document.querySelectorAll('.needs-validation')
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        
+        if (file) {
+            // Validate file type
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+            if (!validTypes.includes(file.type)) {
+                alert('Please select a valid image file (JPEG, PNG, GIF, WEBP)');
+                this.value = '';
+                previewContainer.style.display = 'none';
+                return;
+            }
+            
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image size should be less than 5MB');
+                this.value = '';
+                previewContainer.style.display = 'none';
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                previewContainer.style.display = 'block';
+                imagePreview.src = event.target.result;
+                imagePreview.style.display = 'block';
+                noPreview.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            previewContainer.style.display = 'none';
+            imagePreview.style.display = 'none';
+            noPreview.style.display = 'block';
+        }
+    });
     
-    // Loop over them and prevent submission
-    Array.prototype.slice.call(forms)
-        .forEach(function (form) {
-            form.addEventListener('submit', function (event) {
-                if (!form.checkValidity()) {
-                    event.preventDefault()
-                    event.stopPropagation()
-                }
-                
-                form.classList.add('was-validated')
-            }, false)
-        })
-})()
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const price = parseFloat(document.getElementById('price').value);
+        if (price <= 0) {
+            e.preventDefault();
+            alert('Price must be greater than 0');
+            return;
+        }
+    });
+});
 </script>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.btn {
+    border-radius: 0.375rem;
+}
+</style>
 {% endblock %}

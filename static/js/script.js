@@ -1,6 +1,6 @@
-// Enhanced form validation and image handling - NO PLACEHOLDER
+// Enhanced form validation and image handling
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Script loaded - initializing enhanced image handling');
+    console.log('Script loaded - product images system');
 
     // Basic form validation
     const loginForm = document.querySelector("form[action='{{ url_for('login') }}']");
@@ -54,9 +54,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const file = e.target.files[0];
             if (file) {
                 // Validate file type
-                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
                 if (!validTypes.includes(file.type)) {
-                    alert('Please select a valid image file (JPEG, PNG, GIF)');
+                    alert('Please select a valid image file (JPEG, PNG, GIF, WEBP)');
                     this.value = '';
                     return;
                 }
@@ -103,29 +103,63 @@ document.addEventListener('DOMContentLoaded', function() {
     // Global image reload function
     window.reloadProductImages = function() {
         console.log('Reloading product images...');
-        const images = document.querySelectorAll('.product-image');
+        const productImages = document.querySelectorAll('img[src*="data:image"]');
         const timestamp = new Date().getTime();
         
-        images.forEach(img => {
-            const originalSrc = img.src.split('?')[0];
-            img.src = originalSrc + '?reload=' + timestamp;
+        productImages.forEach(img => {
+            if (img.src) {
+                const originalSrc = img.src.split('?')[0];
+                img.src = originalSrc + '?reload=' + timestamp;
+            }
         });
     };
     
-    // Auto-reload images every 30 seconds to ensure they're fresh
+    // Auto-reload product images every 30 seconds
     setInterval(() => {
         if (document.visibilityState === 'visible') {
             window.reloadProductImages();
         }
     }, 30000);
     
-    // Enhanced error handling for all images - NO PLACEHOLDER
-    document.querySelectorAll('img').forEach(img => {
-        if (img.classList.contains('product-image')) {
-            img.addEventListener('error', function() {
-                console.warn('Product image failed:', this.src);
-                this.style.display = 'none'; // Hide failed images, no placeholder
-            });
-        }
+    // Enhanced error handling for product images
+    document.querySelectorAll('img[src*="data:image"]').forEach(img => {
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        img.addEventListener('error', function() {
+            console.warn('Product image failed to load:', this.src.substring(0, 100));
+            retryCount++;
+            
+            if (retryCount <= maxRetries) {
+                // Try reloading with exponential backoff
+                setTimeout(() => {
+                    const currentSrc = this.src.split('?')[0];
+                    this.src = currentSrc + '?retry=' + retryCount + '&t=' + new Date().getTime();
+                }, 1000 * retryCount);
+            } else {
+                console.error('Product image failed after', maxRetries, 'attempts');
+                // Hide image and show fallback
+                this.style.display = 'none';
+                const fallback = this.nextElementSibling;
+                if (fallback && (fallback.classList.contains('no-image') || fallback.classList.contains('image-fallback'))) {
+                    fallback.style.display = 'flex';
+                }
+            }
+        });
+        
+        img.addEventListener('load', function() {
+            console.log('Product image loaded successfully');
+            retryCount = 0;
+            // Hide fallback if image loads successfully
+            const fallback = this.nextElementSibling;
+            if (fallback && (fallback.classList.contains('no-image') || fallback.classList.contains('image-fallback'))) {
+                fallback.style.display = 'none';
+            }
+        });
     });
+    
+    // Initial product image load assurance
+    setTimeout(() => {
+        window.reloadProductImages();
+    }, 1000);
 });

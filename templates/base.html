@@ -8,15 +8,18 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
-    <!-- Image caching fix -->
+    <!-- Enhanced Image caching fix -->
     <style>
         .product-image {
             width: 100%;
             height: 200px;
             object-fit: cover;
             background-color: #f8f9fa;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
         }
-        .image-placeholder {
+        
+        .no-image {
             background: linear-gradient(45deg, #f8f9fa, #e9ecef);
             display: flex;
             align-items: center;
@@ -24,6 +27,7 @@
             color: #6c757d;
             font-size: 14px;
             height: 200px;
+            border: 2px dashed #dee2e6;
         }
         
         /* Flash message animations */
@@ -57,11 +61,79 @@
             border-left: 4px solid #17a2b8;
         }
         
-        /* Force image reloading after session changes */
+        /* Force image reloading */
         img[src*="data:image"] {
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
         }
+        
+        /* Ensure images are always visible */
+        .card-img-top {
+            background-color: #f8f9fa;
+            min-height: 200px;
+        }
+        
+        /* Image error handling */
+        .image-fallback {
+            display: none;
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            border: 2px dashed #dee2e6;
+        }
+        /* Enhanced image styles for base.html */
+.product-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background-color: #f8f9fa;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    transition: opacity 0.3s ease;
+}
+
+.product-image.loading {
+    opacity: 0.7;
+}
+
+.product-image.loaded {
+    opacity: 1;
+}
+
+.no-image {
+    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 14px;
+    height: 200px;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+}
+
+.image-fallback {
+    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    border: 1px dashed #dee2e6;
+    border-radius: 4px;
+}
+
+/* Force image reloading for base64 images */
+img[src*="data:image"] {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Ensure images are always visible */
+.card-img-top {
+    background-color: #f8f9fa;
+    min-height: 200px;
+}
     </style>
 </head>
 <body>
@@ -245,9 +317,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Flash Messages Auto-close -->
+    <!-- Enhanced Image Reload System -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Initializing enhanced image system...');
+            
             // Auto-hide flash messages after 5 seconds
             const flashMessages = document.querySelectorAll('.flash-message');
             flashMessages.forEach(message => {
@@ -269,13 +343,82 @@
                 document.getElementById('cookieConsent').style.display = 'none';
             });
             
-            // Session keep-alive
+            // Enhanced Session keep-alive with image refresh
             setInterval(() => {
                 fetch('{{ url_for("keepalive") }}', {
                     method: 'POST',
                     credentials: 'include'
+                }).then(() => {
+                    // Refresh images after keepalive
+                    reloadProductImages();
                 }).catch(() => {});
             }, 300000); // 5 minutes
+
+            // Force reload images on page visibility change (when system wakes up)
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    console.log('Page became visible - reloading product images...');
+                    reloadProductImages();
+                }
+            });
+
+            // Enhanced image reload function
+            function reloadProductImages() {
+                console.log('Reloading product images...');
+                const productImages = document.querySelectorAll('img[src*="data:image"]');
+                const timestamp = new Date().getTime();
+                
+                productImages.forEach(img => {
+                    if (img.src) {
+                        const originalSrc = img.src.split('?')[0];
+                        img.src = originalSrc + '?reload=' + timestamp;
+                    }
+                });
+            }
+
+            // Initial image load assurance
+            setTimeout(reloadProductImages, 500);
+            
+            // Periodic image refresh (every 2 minutes)
+            setInterval(reloadProductImages, 120000);
+            
+            // Enhanced error handling for product images
+            document.querySelectorAll('img[src*="data:image"]').forEach(img => {
+                let retryCount = 0;
+                const maxRetries = 3;
+                
+                img.addEventListener('error', function() {
+                    console.warn('Product image failed to load:', this.src.substring(0, 100));
+                    retryCount++;
+                    
+                    if (retryCount <= maxRetries) {
+                        // Try reloading with exponential backoff
+                        setTimeout(() => {
+                            const currentSrc = this.src.split('?')[0];
+                            this.src = currentSrc + '?retry=' + retryCount + '&t=' + new Date().getTime();
+                        }, 1000 * retryCount);
+                    } else {
+                        console.error('Product image failed after', maxRetries, 'attempts');
+                        // Hide image and show fallback if available
+                        this.style.display = 'none';
+                        const fallback = this.nextElementSibling;
+                        if (fallback && fallback.classList.contains('no-image')) {
+                            fallback.style.display = 'flex';
+                        }
+                    }
+                });
+                
+                // Log successful loads
+                img.addEventListener('load', function() {
+                    console.log('Product image loaded successfully');
+                    retryCount = 0;
+                });
+            });
+
+            // Force load all product images on page load
+            window.addEventListener('load', function() {
+                setTimeout(reloadProductImages, 1000);
+            });
         });
 
         function getCookie(name) {

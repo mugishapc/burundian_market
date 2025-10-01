@@ -77,6 +77,9 @@
                 <i class="fas fa-plus"></i> Add Product
             </button>
         {% endif %}
+        <a href="{{ url_for('convert_all_images') }}" class="btn btn-warning ms-2">
+            <i class="fas fa-sync"></i> Convert Images
+        </a>
     </div>
 </div>
 
@@ -195,89 +198,51 @@
             </div>
         </div>
 
-        <!-- Subscription Info Card -->
+        <!-- Products Summary Card -->
         <div class="card mt-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="card-title mb-0"><i class="fas fa-crown me-2"></i>Subscription Info</h5>
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0"><i class="fas fa-chart-pie me-2"></i>Products Summary</h5>
             </div>
             <div class="card-body">
-                {% if subscription_status %}
-                    {% if subscription_status.status == 'trial' %}
-                        <p><strong>Plan:</strong> <span class="badge bg-warning">5-Day Trial</span></p>
-                        {% if subscription_status.active %}
-                            <p><strong>Started:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
-                            <p><strong>Ends:</strong> In {{ subscription_status.days_left }} days</p>
-                        {% else %}
-                            <p><strong>Started:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
-                            <p><strong>Ended:</strong> Trial period completed</p>
-                        {% endif %}
-                    {% elif subscription_status.status == 'subscription' %}
-                        <p><strong>Plan:</strong> <span class="badge bg-success">Paid Subscription</span></p>
-                        {% if user.subscription_start %}
-                            <p><strong>Started:</strong> {{ user.subscription_start.strftime('%Y-%m-%d') }}</p>
-                        {% endif %}
-                        {% if user.subscription_end %}
-                            <p><strong>Ends:</strong> {{ user.subscription_end.strftime('%Y-%m-%d') }}</p>
-                        {% endif %}
-                    {% endif %}
-                    
-                    <p><strong>Days Left:</strong> 
-                        <span class="fw-bold {% if subscription_status.days_left <= 3 %}text-danger{% elif subscription_status.days_left <= 7 %}text-warning{% else %}text-success{% endif %}">
-                            {{ subscription_status.days_left }}
-                        </span>
+                <div class="mb-3">
+                    <p class="mb-1"><strong>Total Products:</strong> {{ products|length }}</p>
+                    <p class="mb-1"><strong>With Images:</strong> 
+                        <span class="text-success">{{ products|selectattr('image_filename')|list|length }}</span>
                     </p>
-                    
-                    <div class="progress mb-3">
-                        {% if subscription_status.status == 'trial' %}
-                            {% set total_days = 5 %}
-                            {% set days_used = 5 - subscription_status.days_left %}
-                            {% set percentage = (days_used / total_days) * 100 %}
-                        {% else %}
-                            {% if user.subscription_start and user.subscription_end %}
-                                {% set total_days = (user.subscription_end - user.subscription_start).days %}
-                                {% set days_used = total_days - subscription_status.days_left %}
-                                {% set percentage = (days_used / total_days) * 100 %}
-                            {% else %}
-                                {% set total_days = 30 %}
-                                {% set days_used = 30 - subscription_status.days_left %}
-                                {% set percentage = (days_used / total_days) * 100 %}
-                            {% endif %}
-                        {% endif %}
-                        
-                        <div class="progress-bar 
-                            {% if percentage >= 80 %}bg-danger
-                            {% elif percentage >= 60 %}bg-warning
-                            {% else %}bg-success{% endif %}" 
-                            role="progressbar" 
-                            style="width: {{ percentage }}%"
-                            aria-valuenow="{{ percentage }}" 
-                            aria-valuemin="0" 
-                            aria-valuemax="100">
-                            {{ "%.0f"|format(percentage) }}%
-                        </div>
+                    <p class="mb-0"><strong>Without Images:</strong> 
+                        <span class="text-warning">{{ products|rejectattr('image_filename')|list|length }}</span>
+                    </p>
+                </div>
+                <div class="progress mb-2" style="height: 20px;">
+                    {% set with_images = products|selectattr('image_filename')|list|length %}
+                    {% set total_products = products|length %}
+                    {% set image_percentage = (with_images / total_products * 100) if total_products > 0 else 0 %}
+                    <div class="progress-bar bg-success" role="progressbar" 
+                         style="width: {{ image_percentage }}%"
+                         aria-valuenow="{{ image_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                        {{ "%.0f"|format(image_percentage) }}%
                     </div>
-                    
-                    <div class="d-grid">
-                        <a href="{{ url_for('seller_subscribe') }}" class="btn 
-                            {% if subscription_status.days_left <= 3 %}btn-warning
-                            {% else %}btn-outline-info{% endif %}">
-                            <i class="fas fa-sync-alt me-1"></i>
-                            {% if subscription_status.status == 'trial' %}
-                                Upgrade Now
-                            {% else %}
-                                Renew Subscription
-                            {% endif %}
-                        </a>
-                    </div>
-                {% else %}
-                    <p class="text-muted">No subscription information available.</p>
-                    <div class="d-grid">
-                        <a href="{{ url_for('seller_subscribe') }}" class="btn btn-success">
-                            <i class="fas fa-shopping-cart me-1"></i>
-                            Get Started
-                        </a>
-                    </div>
-                {% endif %}
+                </div>
+                <small class="text-muted">
+                    {{ "%.0f"|format(image_percentage) }}% of your products have images
+                </small>
+            </div>
+        </div>
+
+        <!-- Image Help Card -->
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0"><i class="fas fa-images me-2"></i>Image Help</h5>
+            </div>
+            <div class="card-body">
+                <p class="small mb-2">
+                    <strong>Having image issues?</strong> Click the "Convert Images" button to switch from base64 to file storage.
+                </p>
+                <div class="d-grid">
+                    <a href="{{ url_for('convert_all_images') }}" class="btn btn-info btn-sm">
+                        <i class="fas fa-sync me-1"></i>Convert Images
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -306,15 +271,17 @@
                                 {% for product in products %}
                                 <tr>
                                     <td>
-                                        {% if product.image %}
-                                        <img src="{{ url_for('static', filename=product.image) }}" 
-                                             alt="{{ product.title }}" 
-                                             class="rounded"
-                                             style="width: 50px; height: 50px; object-fit: cover;">
+                                        {% if product.image_url %}
+                                        <div class="product-image-container" style="width: 50px; height: 50px; position: relative;">
+                                            <img src="{{ product.image_url }}" 
+                                                 alt="{{ product.title }}" 
+                                                 class="product-table-image"
+                                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;"
+                                                 loading="lazy">
+                                        </div>
                                         {% else %}
-                                        <div class="rounded d-flex align-items-center justify-content-center" 
-                                             style="width: 50px; height: 50px; background-color: #eee; color: #999;">
-                                            <i class="fas fa-image"></i>
+                                        <div class="image-fallback" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #f8f9fa; border-radius: 4px; border: 1px dashed #dee2e6;">
+                                            <i class="fas fa-image text-muted"></i>
                                         </div>
                                         {% endif %}
                                     </td>
@@ -322,6 +289,9 @@
                                         <strong>{{ product.title }}</strong>
                                         {% if product.description %}
                                         <br><small class="text-muted">{{ product.description[:50] }}{% if product.description|length > 50 %}...{% endif %}</small>
+                                        {% endif %}
+                                        {% if not product.image_filename %}
+                                        <br><small class="text-warning"><i class="fas fa-exclamation-triangle"></i> No image</small>
                                         {% endif %}
                                     </td>
                                     <td><strong>{{ "{:,.0f}".format(product.price) }} BIF</strong></td>
@@ -368,6 +338,7 @@
                             </tbody>
                         </table>
                     </div>
+                    
                 {% else %}
                     <div class="text-center py-5">
                         <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
@@ -391,4 +362,28 @@
         </div>
     </div>
 </div>
+
+<style>
+.product-table-image {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.product-table-image:hover {
+    border-color: #007bff;
+}
+
+.image-fallback {
+    transition: all 0.3s ease;
+}
+
+.image-fallback:hover {
+    background-color: #e9ecef !important;
+}
+
+.product-image-container {
+    overflow: hidden;
+    border-radius: 4px;
+}
+</style>
 {% endblock %}
