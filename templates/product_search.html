@@ -1,53 +1,364 @@
 {% extends "base.html" %}
-{% block title %}Search Products{% endblock %}
+{% block title %}Browse Products{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2 class="mb-4">Search Products</h2>
-    
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <form action="{{ url_for('product_search') }}" method="GET" class="d-flex">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="text" name="q" class="form-control me-2" 
-                       placeholder="Search products..." value="{{ search_query }}">
-                <select name="category" class="form-select me-2">
-                    <option value="">All Categories</option>
-                    {% for category in categories %}
-                        <option value="{{ category }}" 
-                            {% if selected_category == category %}selected{% endif %}>
-                            {{ category }}
-                        </option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-primary">Search</button>
-            </form>
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-search me-2"></i>Browse Products</h2>
+            <div>
+                <span class="badge bg-primary fs-6">{{ products.total }} products found</span>
+            </div>
         </div>
-    </div>
-    
-    {% if products %}
+
+        <!-- Search Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('product_search') }}">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <span class="input-group-text bg-primary text-white">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control form-control-lg" 
+                                       name="q" value="{{ search_query }}" 
+                                       placeholder="Search for products...">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-select form-select-lg" name="category" onchange="this.form.submit()">
+                                <option value="">All Categories</option>
+                                {% for category in categories %}
+                                <option value="{{ category }}" 
+                                        {% if selected_category == category %}selected{% endif %}>
+                                    {{ category }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary btn-lg w-100">
+                                <i class="fas fa-filter me-2"></i>Filter
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Category Quick Filters -->
+        {% if categories %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Quick Categories</h5>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('product_search') }}" 
+                       class="btn btn-outline-primary btn-sm {% if not selected_category %}active{% endif %}">
+                        All Categories
+                    </a>
+                    {% for category in categories %}
+                    <a href="{{ url_for('product_search') }}?category={{ category }}" 
+                       class="btn btn-outline-primary btn-sm {% if selected_category == category %}active{% endif %}">
+                        {{ category }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Products Grid -->
+        {% if products.items %}
         <div class="row">
-            {% for product in products %}
+            {% for product in products.items %}
             <div class="col-md-3 mb-4">
-                <div class="card h-100">
-                    <img src="{{ url_for('static', filename=product.image) }}" 
-                         class="card-img-top product-image" 
-                         alt="{{ product.title }}">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ product.title }}</h5>
-                        <p class="card-text text-success fw-bold">{{ product.price }} BIF</p>
-                        <p class="card-text text-muted">{{ product.category }}</p>
-                        <a href="{{ url_for('product_detail', product_id=product.id) }}" 
-                           class="btn btn-primary">View Details</a>
+                <div class="card h-100 product-card">
+                    <!-- Product Image -->
+                    <div class="product-image-container position-relative">
+                        {% if product.image_url %}
+                        <img src="{{ product.image_url }}" 
+                             class="card-img-top product-image" 
+                             alt="{{ product.title }}"
+                             style="height: 200px; object-fit: cover;"
+                             loading="lazy"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        {% endif %}
+                        <div class="no-image-placeholder" 
+                             style="height: 200px; {% if product.image_url %}display: none;{% else %}display: flex;{% endif %}">
+                            <div class="text-center w-100">
+                                <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                                <p class="text-muted mb-0 small">No Image</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Category Badge -->
+                        {% if product.category %}
+                        <div class="position-absolute top-0 start-0 m-2">
+                            <span class="badge bg-primary">{{ product.category }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title product-title">
+                            <a href="{{ url_for('product_detail', product_id=product.id) }}" 
+                               class="text-decoration-none text-dark">
+                                {{ product.title }}
+                            </a>
+                        </h5>
+                        
+                        {% if product.description %}
+                        <p class="card-text text-muted small flex-grow-1">
+                            {{ product.description[:80] }}{% if product.description|length > 80 %}...{% endif %}
+                        </p>
+                        {% endif %}
+                        
+                        <div class="mt-auto">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="text-success mb-0">{{ product.price }} BIF</h5>
+                                <small class="text-muted">
+                                    <i class="fas fa-store me-1"></i>{{ product.seller.username }}
+                                </small>
+                            </div>
+                            <a href="{{ url_for('product_detail', product_id=product.id) }}" 
+                               class="btn btn-primary w-100 mt-2">
+                                <i class="fas fa-eye me-1"></i>View Details
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
-    {% else %}
-        <div class="alert alert-info">
-            No products found matching your search criteria.
+
+        <!-- Pagination -->
+        {% if products.pages > 1 %}
+        <nav aria-label="Products pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if products.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" 
+                       href="{{ url_for('product_search', page=products.prev_num, q=search_query, category=selected_category) }}">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-chevron-left"></i> Previous</span>
+                </li>
+                {% endif %}
+
+                {% for page_num in products.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                    {% if page_num %}
+                        {% if page_num == products.page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" 
+                               href="{{ url_for('product_search', page=page_num, q=search_query, category=selected_category) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if products.has_next %}
+                <li class="page-item">
+                    <a class="page-link" 
+                       href="{{ url_for('product_search', page=products.next_num, q=search_query, category=selected_category) }}">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">Next <i class="fas fa-chevron-right"></i></span>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <!-- No Products Found -->
+        <div class="text-center py-5">
+            <div class="card">
+                <div class="card-body py-5">
+                    <i class="fas fa-search fa-4x text-muted mb-3"></i>
+                    <h3 class="text-muted">No Products Found</h3>
+                    <p class="text-muted mb-4">
+                        {% if search_query %}
+                        No products found for "{{ search_query }}"
+                        {% elif selected_category %}
+                        No products found in category "{{ selected_category }}"
+                        {% else %}
+                        No products available at the moment
+                        {% endif %}
+                    </p>
+                    <a href="{{ url_for('product_search') }}" class="btn btn-primary">
+                        <i class="fas fa-undo me-2"></i>Browse All Products
+                    </a>
+                </div>
+            </div>
         </div>
-    {% endif %}
+        {% endif %}
+    </div>
 </div>
+
+<style>
+.product-card {
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    border-color: #007bff;
+}
+
+.product-image-container {
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+.product-image {
+    transition: transform 0.3s ease;
+}
+
+.product-card:hover .product-image {
+    transform: scale(1.05);
+}
+
+.no-image-placeholder {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.product-title {
+    font-size: 1.1rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.card-text {
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.page-link {
+    border-radius: 0.375rem;
+    margin: 0 2px;
+}
+
+.page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .col-md-3 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
+@media (max-width: 576px) {
+    .col-md-3 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    
+    .d-flex.flex-wrap {
+        justify-content: center;
+    }
+    
+    .btn-sm {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
+
+<script>
+// Enhanced image handling for search page
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Browse Products page loaded - checking images');
+    
+    const productImages = document.querySelectorAll('.product-image');
+    console.log(`Found ${productImages.length} product images on browse page`);
+    
+    productImages.forEach((img, index) => {
+        const productName = img.alt || `Product ${index + 1}`;
+        
+        // Check if image is already loaded
+        if (img.complete) {
+            if (img.naturalHeight === 0) {
+                console.log(`❌ Browse page image failed: "${productName}"`);
+                img.style.display = 'none';
+                const placeholder = img.nextElementSibling;
+                if (placeholder && placeholder.classList.contains('no-image-placeholder')) {
+                    placeholder.style.display = 'flex';
+                }
+            } else {
+                console.log(`✅ Browse page image loaded: "${productName}"`);
+            }
+        } else {
+            // Image is still loading
+            img.addEventListener('load', function() {
+                console.log(`✅ Browse page image loaded: "${productName}"`);
+            });
+            
+            img.addEventListener('error', function() {
+                console.log(`❌ Browse page image failed: "${productName}"`);
+                this.style.display = 'none';
+                const placeholder = this.nextElementSibling;
+                if (placeholder && placeholder.classList.contains('no-image-placeholder')) {
+                    placeholder.style.display = 'flex';
+                }
+            });
+        }
+    });
+    
+    // Add loading animation
+    const productCards = document.querySelectorAll('.product-card');
+    productCards.forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+    });
+    
+    // Animate cards in
+    setTimeout(() => {
+        productCards.forEach((card, index) => {
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    }, 100);
+});
+
+// Quick search functionality
+function quickSearch(category) {
+    window.location.href = `{{ url_for('product_search') }}?category=${encodeURIComponent(category)}`;
+}
+</script>
 {% endblock %}
