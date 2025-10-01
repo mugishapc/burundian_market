@@ -1,170 +1,202 @@
 {% extends "base.html" %}
-{% block title %}User Details{% endblock %}
+{% block title %}User Details - {{ user.username }}{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2 class="my-4">User Details: {{ user.username }}</h2>
-    
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5>Basic Information</h5>
-                </div>
-                <div class="card-body">
-                    <p><strong>Username:</strong> {{ user.username }}</p>
-                    <p><strong>Email:</strong> {{ user.email }}</p>
-                    <p><strong>Phone:</strong> {{ user.phone }}</p>
-                    <p><strong>User Type:</strong> {{ user.user_type }}</p>
-                    <p><strong>Registered:</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
-                    
-                    {% if user.user_type == 'seller' %}
-                        <p><strong>Status:</strong> 
-                            {% if user.is_seller_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-danger">Inactive</span>
-                            {% endif %}
-                        </p>
-                        {% if user.subscription_end %}
-                            <p><strong>Subscription End:</strong> {{ user.subscription_end.strftime('%Y-%m-%d %H:%M') }}</p>
-                            <p><strong>Days Left:</strong> {{ (user.subscription_end - datetime.now()).days }} days</p>
-                        {% endif %}
-                    {% endif %}
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('admin_send_message', user_id=user.id) }}" class="btn btn-info">Send Message</a>
-                    <form action="{{ url_for('admin_delete_user', user_id=user.id) }}" method="POST" style="display:inline;">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-user me-2"></i>User Details: {{ user.username }}</h2>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+    </a>
+</div>
+
+<div class="row">
+    <!-- User Information -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2"></i>User Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Username:</strong> {{ user.username }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Phone:</strong> {{ user.phone or 'Not provided' }}</p>
+                <p><strong>User Type:</strong> 
+                    <span class="badge 
+                        {% if user.user_type == 'admin' %}bg-danger
+                        {% elif user.user_type == 'seller' %}bg-warning text-dark
+                        {% else %}bg-info{% endif %}">
+                        {{ user.user_type|title }}
+                    </span>
+                </p>
+                <p><strong>Status:</strong> 
+                    <span class="badge bg-{% if user.is_verified %}success{% else %}warning text-dark{% endif %}">
+                        {{ 'Verified' if user.is_verified else 'Not Verified' }}
+                    </span>
+                </p>
+                <p><strong>Joined:</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                {% if user.last_login %}
+                <p><strong>Last Login:</strong> {{ user.last_login.strftime('%Y-%m-%d %H:%M') }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card mt-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="card-title mb-0"><i class="fas fa-cogs me-2"></i>Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('admin_send_message', user_id=user.id) }}" class="btn btn-info">
+                        <i class="fas fa-envelope me-2"></i>Send Message
+                    </a>
+                    {% if user.user_type != 'admin' %}
+                    <form action="{{ url_for('admin_delete_user', user_id=user.id) }}" method="POST"
+                          onsubmit="return confirm('Are you sure you want to delete {{ user.username }}? This action cannot be undone.');">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this user?')">Delete User</button>
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="fas fa-trash me-2"></i>Delete User
+                        </button>
                     </form>
+                    {% endif %}
                 </div>
             </div>
         </div>
-        
+
+        <!-- Seller Subscription Management -->
         {% if user.user_type == 'seller' %}
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5>Subscription Management</h5>
-                </div>
-                <div class="card-body">
-                    {% if not user.is_seller_active %}
-                        <div class="alert alert-warning">
-                            This seller account is currently inactive.
-                        </div>
-                    {% endif %}
-                    
-                    <form method="POST" action="{{ url_for('admin_activate_seller', user_id=user.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        
-                        <div class="mb-3">
-                            <label for="days" class="form-label">Subscription Period (days)</label>
-                            <select class="form-select" id="days" name="days" required>
-                                <option value="30">30 days (15,000 BIF)</option>
-                                <option value="60">60 days (30,000 BIF)</option>
-                                <option value="120">120 days (60,000 BIF)</option>
-                                <option value="180">180 days (75,000 BIF)</option>
-                                <option value="250">250 days (90,000 BIF)</option>
-                                <option value="300">300 days (120,000 BIF)</option>
-                                <option value="365">365 days (155,000 BIF)</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="payment_proof" class="form-label">Payment Proof Reference</label>
-                            <input type="text" class="form-control" id="payment_proof" name="payment_proof" required>
-                        </div>
-                        <button type="submit" class="btn btn-success">Activate Subscription</button>
-                    </form>
-                </div>
+        <div class="card mt-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0"><i class="fas fa-crown me-2"></i>Subscription Management</h5>
+            </div>
+            <div class="card-body">
+                {% if user.subscription_status %}
+                <p><strong>Current Status:</strong> 
+                    <span class="badge bg-{% if user.subscription_status.active %}success{% else %}danger{% endif %}">
+                        {{ 'Active' if user.subscription_status.active else 'Inactive' }}
+                    </span>
+                </p>
+                <p><strong>Plan Type:</strong> {{ user.subscription_status.status|title }}</p>
+                <p><strong>Days Left:</strong> {{ user.subscription_status.days_left }}</p>
+                {% if user.subscription_end %}
+                <p><strong>Ends:</strong> {{ user.subscription_end.strftime('%Y-%m-%d') }}</p>
+                {% endif %}
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('admin_activate_seller', user_id=user.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="days" class="form-label">Subscription Days</label>
+                        <input type="number" class="form-control" id="days" name="days" 
+                               min="1" max="365" value="30" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="payment_proof" class="form-label">Payment Reference</label>
+                        <input type="text" class="form-control" id="payment_proof" name="payment_proof" 
+                               placeholder="Payment proof or reference">
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-check me-2"></i>Activate Subscription
+                    </button>
+                </form>
             </div>
         </div>
         {% endif %}
     </div>
-    
-    {% if user.user_type == 'seller' %}
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5>Products ({{ products|length }})</h5>
-        </div>
-        <div class="card-body">
-            {% if products %}
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Title</th>
-                            <th>Price</th>
-                            <th>Category</th>
-                            <th>Posted</th>
-                            <th>Image</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for product in products %}
-                        <tr>
-                            <td>{{ product.id }}</td>
-                            <td>{{ product.title }}</td>
-                            <td>{{ product.price }} BIF</td>
-                            <td>{{ product.category }}</td>
-                            <td>{{ product.created_at.strftime('%Y-%m-%d') }}</td>
-                            <td>
-                                {% if product.image %}
-                                <a href="{{ url_for('static', filename=product.image) }}" target="_blank">
-                                    <img src="{{ url_for('static', filename=product.image) }}" style="max-width: 50px; max-height: 50px;" class="img-thumbnail">
-                                </a>
-                                {% else %}
-                                No image
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+    <!-- User's Products -->
+    <div class="col-md-8">
+        {% if user.user_type == 'seller' %}
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="fas fa-boxes me-2"></i>User's Products</h5>
+                <span class="badge bg-light text-primary">{{ products|length }} products</span>
             </div>
-            {% else %}
-            <p>This seller has no products listed.</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Product Images Section -->
-    {% set has_images = false %}
-    {% for product in products if product.image %}
-        {% if loop.first %}{% set has_images = true %}{% endif %}
-    {% endfor %}
-
-    {% if products and has_images %}
-    <div class="card">
-        <div class="card-header">
-            <h5>Product Images Gallery</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                {% for product in products if product.image %}
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100">
-                        <img src="{{ url_for('static', filename=product.image) }}" class="card-img-top img-thumbnail" alt="{{ product.title }}" style="height: 200px; object-fit: cover;">
-                        <div class="card-body">
-                            <h6 class="card-title">{{ product.title }}</h6>
-                            <p class="card-text small text-muted">
-                                {{ product.category }}<br>
-                                {{ product.price }} BIF
-                            </p>
-                        </div>
-                        <div class="card-footer bg-transparent">
-                            <a href="{{ url_for('static', filename=product.image) }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
-                                <i class="fas fa-expand"></i> View Full Size
-                            </a>
-                        </div>
-                    </div>
+            <div class="card-body">
+                {% if products %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>Title</th>
+                                <th>Price</th>
+                                <th>Category</th>
+                                <th>Date Added</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in products %}
+                            <tr>
+                                <td>
+                                    {% if product.image_url %}
+                                    <img src="{{ product.image_url }}" 
+                                         alt="{{ product.title }}"
+                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div class="image-fallback" 
+                                         style="width: 50px; height: 50px; display: none; align-items: center; justify-content: center; background: #f8f9fa; border-radius: 4px; border: 1px dashed #dee2e6;">
+                                        <i class="fas fa-image text-muted"></i>
+                                    </div>
+                                    {% else %}
+                                    <div class="image-fallback" 
+                                         style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #f8f9fa; border-radius: 4px; border: 1px dashed #dee2e6;">
+                                        <i class="fas fa-image text-muted"></i>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ product.title }}</strong>
+                                    {% if product.description %}
+                                    <br><small class="text-muted">{{ product.description[:50] }}{% if product.description|length > 50 %}...{% endif %}</small>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ product.price }} BIF</strong></td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ product.category or 'Uncategorized' }}</span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ product.created_at.strftime('%Y-%m-%d') }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                {% endfor %}
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No Products</h5>
+                    <p class="text-muted">This seller hasn't listed any products yet.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-shopping-basket fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">Buyer Account</h5>
+                <p class="text-muted">This user is a buyer and doesn't have any products.</p>
+            </div>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
-    {% endif %}
 </div>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.image-fallback {
+    font-size: 0.8rem;
+}
+</style>
 {% endblock %}

@@ -1,54 +1,266 @@
 {% extends "base.html" %}
-{% block title %}Browse Products{% endblock %}
+{% block title %}Buyer Dashboard{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Browse Products</h2>
-
-<div class="row mb-4">
-    <div class="col-md-8">
-        <form action="{{ url_for('product_search') }}" method="GET" class="d-flex">
-            <input type="text" name="q" class="form-control me-2" placeholder="Search products..." 
-                   value="{{ request.args.get('q', '') }}">
-            <select name="category" class="form-select me-2">
-                <option value="">All Categories</option>
-                {% for category in categories %}
-                    <option value="{{ category }}" 
-                            {% if request.args.get('category') == category %}selected{% endif %}>
-                        {{ category }}
-                    </option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn btn-primary">Search</button>
-        </form>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-shopping-basket me-2"></i>Buyer Dashboard</h2>
+    <div>
+        <a href="{{ url_for('product_search') }}" class="btn btn-primary">
+            <i class="fas fa-search me-1"></i>Browse All Products
+        </a>
     </div>
 </div>
 
-{% if products %}
-<div class="row">
-    {% for product in products %}
-    <div class="col-md-3 mb-4">
-        <div class="card h-100">
-            {% if product.image %}
-            <img src="{{ url_for('static', filename=product.image) }}" 
-                 class="card-img-top product-image" 
-                 alt="{{ product.title }}"
-                 style="height: 200px; object-fit: cover;">
-            {% else %}
-            <div class="card-img-top bg-secondary" style="height: 200px;"></div>
-            {% endif %}
-            <div class="card-body">
-                <h5 class="card-title">{{ product.title }}</h5>
-                <p class="card-text text-success fw-bold">{{ product.price }} BIF</p>
-                {% if product.category %}
-                <p class="card-text text-muted">{{ product.category }}</p>
-                {% endif %}
-                <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn btn-primary">View Details</a>
+<!-- Categories Section -->
+{% if categories %}
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0"><i class="fas fa-tags me-2"></i>Shop by Category</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for category in categories %}
+            <div class="col-md-3 mb-2">
+                <a href="{{ url_for('product_search') }}?category={{ category }}" 
+                   class="btn btn-outline-primary w-100 text-start">
+                    <i class="fas fa-folder me-2"></i>{{ category }}
+                </a>
             </div>
+            {% endfor %}
         </div>
     </div>
-    {% endfor %}
 </div>
-{% else %}
-<div class="alert alert-info">No products found matching your search.</div>
 {% endif %}
+
+<!-- All Products Section -->
+<div class="card">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0"><i class="fas fa-boxes me-2"></i>All Products</h5>
+        <span class="badge bg-light text-success">{{ products|length }} products available</span>
+    </div>
+    <div class="card-body">
+        {% if products %}
+        <div class="row">
+            {% for product in products %}
+            <div class="col-md-3 mb-4">
+                <div class="card h-100 product-card">
+                    <!-- Product Image -->
+                    <div class="product-image-container position-relative">
+                        {% if product.image_url %}
+                        <img src="{{ product.image_url }}" 
+                             class="card-img-top product-image" 
+                             alt="{{ product.title }}"
+                             style="height: 200px; object-fit: cover;"
+                             loading="lazy"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        {% endif %}
+                        <div class="no-image-placeholder" 
+                             style="height: 200px; {% if product.image_url %}display: none;{% else %}display: flex;{% endif %}">
+                            <div class="text-center w-100">
+                                <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                                <p class="text-muted mb-0 small">No Image</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Category Badge -->
+                        {% if product.category %}
+                        <div class="position-absolute top-0 start-0 m-2">
+                            <span class="badge bg-primary">{{ product.category }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Seller Status Badge -->
+                        <div class="position-absolute top-0 end-0 m-2">
+                            {% if product.seller.is_verified %}
+                            <span class="badge bg-success" title="Verified Seller">
+                                <i class="fas fa-check-circle me-1"></i>Verified
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark" title="Unverified Seller">
+                                <i class="fas fa-clock me-1"></i>Pending
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title product-title">
+                            <a href="{{ url_for('product_detail', product_id=product.id) }}" 
+                               class="text-decoration-none text-dark">
+                                {{ product.title }}
+                            </a>
+                        </h5>
+                        
+                        {% if product.description %}
+                        <p class="card-text text-muted small flex-grow-1">
+                            {{ product.description[:80] }}{% if product.description|length > 80 %}...{% endif %}
+                        </p>
+                        {% endif %}
+                        
+                        <div class="mt-auto">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="text-success mb-0">{{ product.price }} BIF</h5>
+                                <small class="text-muted">
+                                    <i class="fas fa-store me-1"></i>{{ product.seller.username }}
+                                </small>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <a href="{{ url_for('product_detail', product_id=product.id) }}" 
+                                   class="btn btn-primary">
+                                    <i class="fas fa-eye me-1"></i>View Details
+                                </a>
+                                {% if product.seller.phone %}
+                                <a href="https://wa.me/{{ product.seller.phone }}?text=Hi! I'm interested in your product: {{ product.title }}" 
+                                   class="btn btn-success" target="_blank">
+                                    <i class="fab fa-whatsapp me-1"></i>Contact Seller
+                                </a>
+                                {% else %}
+                                <button class="btn btn-secondary" disabled>
+                                    <i class="fas fa-phone me-1"></i>No Contact
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <!-- No Products Available -->
+        <div class="text-center py-5">
+            <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">No Products Available</h4>
+            <p class="text-muted mb-4">There are no products listed yet. Check back later!</p>
+            {% if session.user_type == 'seller' %}
+            <a href="{{ url_for('add_product') }}" class="btn btn-success">
+                <i class="fas fa-plus me-2"></i>Add Your First Product
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.product-card {
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    border-color: #007bff;
+}
+
+.product-image-container {
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+.product-image {
+    transition: transform 0.3s ease;
+}
+
+.product-card:hover .product-image {
+    transform: scale(1.05);
+}
+
+.no-image-placeholder {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.product-title {
+    font-size: 1.1rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.card-text {
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .col-md-3 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
+@media (max-width: 576px) {
+    .col-md-3 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Buyer dashboard loaded - checking images');
+    
+    const productImages = document.querySelectorAll('.product-image');
+    console.log(`Found ${productImages.length} product images on buyer dashboard`);
+    
+    productImages.forEach((img, index) => {
+        const productName = img.alt || `Product ${index + 1}`;
+        
+        // Check if image is already loaded
+        if (img.complete) {
+            if (img.naturalHeight === 0) {
+                console.log(`❌ Buyer dashboard image failed: "${productName}"`);
+                img.style.display = 'none';
+                const placeholder = img.nextElementSibling;
+                if (placeholder && placeholder.classList.contains('no-image-placeholder')) {
+                    placeholder.style.display = 'flex';
+                }
+            } else {
+                console.log(`✅ Buyer dashboard image loaded: "${productName}"`);
+            }
+        } else {
+            // Image is still loading
+            img.addEventListener('load', function() {
+                console.log(`✅ Buyer dashboard image loaded: "${productName}"`);
+            });
+            
+            img.addEventListener('error', function() {
+                console.log(`❌ Buyer dashboard image failed: "${productName}"`);
+                this.style.display = 'none';
+                const placeholder = this.nextElementSibling;
+                if (placeholder && placeholder.classList.contains('no-image-placeholder')) {
+                    placeholder.style.display = 'flex';
+                }
+            });
+        }
+    });
+    
+    // Add loading animation
+    const productCards = document.querySelectorAll('.product-card');
+    productCards.forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+    });
+    
+    // Animate cards in
+    setTimeout(() => {
+        productCards.forEach((card, index) => {
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    }, 100);
+});
+</script>
 {% endblock %}
