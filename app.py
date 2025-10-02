@@ -704,6 +704,7 @@ def refresh_session():
 @app.route('/products/search')
 def product_search():
     query = request.args.get('q', '').strip()
+    category = request.args.get('category', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = 12  # Products per page
 
@@ -722,11 +723,16 @@ def product_search():
             )
         )
 
+    # Apply category filter if specified
+    if category:
+        products_query = products_query.filter(Product.category == category)
+
     # Get all available categories (for dropdown/filter display)
     categories = db.session.query(
         Product.category.distinct().label('category')
     ).filter(
-        Product.category.isnot(None)
+        Product.category.isnot(None),
+        User.is_seller_active == True  # Only include categories from active sellers
     ).order_by(
         'category'
     ).all()
@@ -750,7 +756,7 @@ def product_search():
         products=products,
         search_query=query,
         categories=categories,
-        selected_category=None  # No category selected when doing general search
+        selected_category=category  # Pass the selected category back to template
     )
 
 @app.route('/login', methods=['GET', 'POST'])
