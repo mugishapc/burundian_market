@@ -207,14 +207,14 @@
                 <div class="mb-3">
                     <p class="mb-1"><strong>Total Products:</strong> {{ products|length }}</p>
                     <p class="mb-1"><strong>With Images:</strong> 
-                        <span class="text-success">{{ products|selectattr('image_filename')|list|length }}</span>
+                        <span class="text-success">{{ products|selectattr('image_data')|list|length }}</span>
                     </p>
                     <p class="mb-0"><strong>Without Images:</strong> 
-                        <span class="text-warning">{{ products|rejectattr('image_filename')|list|length }}</span>
+                        <span class="text-warning">{{ products|rejectattr('image_data')|list|length }}</span>
                     </p>
                 </div>
                 <div class="progress mb-2" style="height: 20px;">
-                    {% set with_images = products|selectattr('image_filename')|list|length %}
+                    {% set with_images = products|selectattr('image_data')|list|length %}
                     {% set total_products = products|length %}
                     {% set image_percentage = (with_images / total_products * 100) if total_products > 0 else 0 %}
                     <div class="progress-bar bg-success" role="progressbar" 
@@ -271,9 +271,9 @@
                                 {% for product in products %}
                                 <tr>
                                     <td>
-                                        {% if product.image_url %}
+                                        {% if product.image_data %}
                                         <div class="product-image-container" style="width: 50px; height: 50px; position: relative;">
-                                            <img src="{{ product.image_url }}" 
+                                            <img src="{{ url_for('get_product_image', product_id=product.id) }}" 
                                                  alt="{{ product.title }}" 
                                                  class="product-table-image"
                                                  style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;"
@@ -290,11 +290,11 @@
                                         {% if product.description %}
                                         <br><small class="text-muted">{{ product.description[:50] }}{% if product.description|length > 50 %}...{% endif %}</small>
                                         {% endif %}
-                                        {% if not product.image_filename %}
+                                        {% if not product.image_data %}
                                         <br><small class="text-warning"><i class="fas fa-exclamation-triangle"></i> No image</small>
                                         {% endif %}
                                     </td>
-                                    <td><strong>{{ "{:,.0f}".format(product.price) }} BIF</strong></td>
+                                    <td><strong>{{ product.price|format_currency }} BIF</strong></td>
                                     <td>
                                         <span class="badge bg-secondary">{{ product.category or 'Uncategorized' }}</span>
                                     </td>

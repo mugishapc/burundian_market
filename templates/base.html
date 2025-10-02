@@ -123,8 +123,8 @@
     border-radius: 4px;
 }
 
-/* Force image reloading for base64 images */
-img[src*="data:image"] {
+/* Force image reloading for database images */
+img[src*="/product/image/"] {
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
 }
@@ -363,16 +363,17 @@ img[src*="data:image"] {
                 }
             });
 
-            // Enhanced image reload function
+            // Enhanced image reload function for database images
             function reloadProductImages() {
-                console.log('Reloading product images...');
-                const productImages = document.querySelectorAll('img[src*="data:image"]');
+                console.log('Reloading product images from database...');
+                const productImages = document.querySelectorAll('img[src*="/product/image/"]');
                 const timestamp = new Date().getTime();
                 
                 productImages.forEach(img => {
                     if (img.src) {
-                        const originalSrc = img.src.split('?')[0];
-                        img.src = originalSrc + '?reload=' + timestamp;
+                        // Add timestamp to force reload
+                        const separator = img.src.includes('?') ? '&' : '?';
+                        img.src = img.src + separator + 'reload=' + timestamp;
                     }
                 });
             }
@@ -384,12 +385,12 @@ img[src*="data:image"] {
             setInterval(reloadProductImages, 120000);
             
             // Enhanced error handling for product images
-            document.querySelectorAll('img[src*="data:image"]').forEach(img => {
+            document.querySelectorAll('img[src*="/product/image/"]').forEach(img => {
                 let retryCount = 0;
                 const maxRetries = 3;
                 
                 img.addEventListener('error', function() {
-                    console.warn('Product image failed to load:', this.src.substring(0, 100));
+                    console.warn('Product image failed to load:', this.src);
                     retryCount++;
                     
                     if (retryCount <= maxRetries) {
@@ -411,8 +412,9 @@ img[src*="data:image"] {
                 
                 // Log successful loads
                 img.addEventListener('load', function() {
-                    console.log('Product image loaded successfully');
+                    console.log('Product image loaded successfully from database');
                     retryCount = 0;
+                    this.classList.add('loaded');
                 });
             });
 

@@ -4,8 +4,8 @@
 {% block content %}
 <div class="row">
     <div class="col-md-6">
-        {% if product.image_url %}
-            <img src="{{ product.image_url }}" 
+        {% if product.image_data %}
+            <img src="{{ url_for('get_product_image', product_id=product.id) }}" 
                  class="img-fluid rounded product-image" 
                  alt="{{ product.title }}"
                  style="max-height: 500px; object-fit: contain;"
@@ -24,7 +24,7 @@
     <div class="col-md-6">
         <h2>{{ product.title }}</h2>
         <p class="text-muted">{{ product.category }}</p>
-        <h3 class="text-success my-4">{{ product.price }} BIF</h3>
+        <h3 class="text-success my-4">{{ product.price|format_currency }} BIF</h3>
         
         <div class="mb-4">
             <h4>Description</h4>
@@ -81,15 +81,15 @@
         <div class="col-md-3 mb-4">
             <div class="card h-100">
                 <a href="{{ url_for('product_detail', product_id=similar.id) }}">
-                    {% if similar.image_url %}
-                    <img src="{{ similar.image_url }}" 
+                    {% if similar.image_data %}
+                    <img src="{{ url_for('get_product_image', product_id=similar.id) }}" 
                          class="card-img-top product-image" 
                          alt="{{ similar.title }}"
                          style="height: 200px; object-fit: cover;"
                          loading="eager"
                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                     {% endif %}
-                    <div class="no-image" style="height: 200px; {% if similar.image_url %}display: none;{% else %}display: flex;{% endif %}">
+                    <div class="no-image" style="height: 200px; {% if similar.image_data %}display: none;{% else %}display: flex;{% endif %}">
                         <i class="fas fa-camera text-muted fa-2x"></i>
                     </div>
                 </a>
@@ -99,7 +99,7 @@
                             {{ similar.title }}
                         </a>
                     </h5>
-                    <p class="card-text text-success fw-bold">{{ similar.price }} BIF</p>
+                    <p class="card-text text-success fw-bold">{{ similar.price|format_currency }} BIF</p>
                 </div>
             </div>
         </div>
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Product detail page loaded');
     
     const mainImage = document.querySelector('.product-image');
-    if (mainImage && mainImage.src.includes('data:image')) {
+    if (mainImage && mainImage.src.includes('/product/image/')) {
         console.log('Main product image found, forcing reload...');
         
         // Force reload main product image
@@ -134,12 +134,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Main product image loaded successfully');
         });
     } else {
-        console.log('No product image found or not base64 image');
+        console.log('No product image found or not database image');
     }
     
     // Handle similar product images
     document.querySelectorAll('.card-img-top.product-image').forEach(img => {
-        if (img.src.includes('data:image')) {
+        if (img.src.includes('/product/image/')) {
             setTimeout(() => {
                 const originalSrc = img.src.split('?')[0];
                 img.src = originalSrc + '?reload=' + new Date().getTime();

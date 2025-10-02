@@ -16,15 +16,15 @@
         {% for product in products %}
         <div class="col-md-3 mb-4">
             <div class="card h-100 product-card">
-                {% if product.image_url %}
-                    <img src="{{ product.image_url }}" 
+                {% if product.image_data %}
+                    <img src="{{ url_for('get_product_image', product_id=product.id) }}" 
                          class="card-img-top product-image" 
                          alt="{{ product.title }}"
                          style="height: 200px; object-fit: cover;"
                          loading="eager"
                          onerror="console.log('Home page image error for {{ product.title }}'); this.style.display='none'; this.nextElementSibling.style.display='flex';">
                 {% endif %}
-                <div class="no-image" style="height: 200px; {% if product.image_url %}display: none;{% else %}display: flex;{% endif %}">
+                <div class="no-image" style="height: 200px; {% if product.image_data %}display: none;{% else %}display: flex;{% endif %}">
                     <div class="text-center">
                         <i class="fas fa-camera fa-2x text-muted mb-2"></i>
                         <p class="text-muted mb-0">No Image</p>
@@ -32,7 +32,7 @@
                 </div>
                 <div class="card-body">
                     <h5 class="card-title">{{ product.title }}</h5>
-                    <p class="card-text text-success fw-bold">{{ product.price }} BIF</p>
+                    <p class="card-text text-success fw-bold">{{ product.price|format_currency }} BIF</p>
                     <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn btn-primary">View Details</a>
                 </div>
             </div>
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log(`Found ${productImages.length} product images on home page`);
     
     productImages.forEach((img, index) => {
-        if (img.src && img.src.includes('data:image')) {
+        if (img.src && img.src.includes('/product/image/')) {
             console.log(`Loading home page image ${index + 1}: ${img.alt}`);
             
             // Create new image object to force load
