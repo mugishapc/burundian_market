@@ -640,7 +640,7 @@ def get_payment_proof(request_id):
 def home():
     products = Product.query.join(User).filter(
         User.is_seller_active == True
-    ).order_by(Product.created_at.desc()).limit(8).all()
+    ).order_by(Product.created_at.desc()).limit(6).all()
     
     # Ensure proper image URLs
     for product in products:
