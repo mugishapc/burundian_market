@@ -87,6 +87,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 200 * (index + 1));
         }
     });
+
+    // PropellerAds optimization for home page
+    // Trigger ad loading after page is fully loaded
+    window.addEventListener('load', function() {
+        console.log('Home page fully loaded - PropellerAds should be active');
+        
+        // Additional PropellerAds optimization
+        if (typeof self !== 'undefined' && self.lary !== undefined) {
+            console.log('PropellerAds service worker is active');
+        }
+    });
 });
 </script>
 
@@ -103,7 +114,37 @@ document.addEventListener('DOMContentLoaded', function() {
 .product-image {
     background-color: #f8f9fa;
 }
+
+/* PropellerAds specific styles for home page */
+.hero-section {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
 </style>
-<p class="lead" style="color: red;">TO SEE MORE PRODUCTS, PLEASE REGISTER AND LOGIN AS A BUYER.</p>
-<p class="lead" style="color: red;">TO SHOW THE WORLD WHAT YOU DO, PLEASE REGISTER AND LOGIN AS A SELLER.</p>
+
+<!-- Registration Call-to-Action -->
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <h3 class="card-title text-warning">Join Our Marketplace Today!</h3>
+                    <p class="lead" style="color: #dc3545; font-weight: bold;">
+                        TO SEE MORE PRODUCTS, PLEASE REGISTER AND LOGIN AS A BUYER.
+                    </p>
+                    <p class="lead" style="color: #dc3545; font-weight: bold;">
+                        TO SHOW THE WORLD WHAT YOU DO, PLEASE REGISTER AND LOGIN AS A SELLER.
+                    </p>
+                    <div class="mt-4">
+                        <a href="{{ url_for('register') }}" class="btn btn-success btn-lg me-3">
+                            <i class="fas fa-user-plus"></i> Register Now
+                        </a>
+                        <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

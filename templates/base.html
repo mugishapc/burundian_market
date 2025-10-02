@@ -8,6 +8,17 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
+    <!-- PropellerAds Popunder/Push Notification Code -->
+    <script>
+        // PropellerAds Advertising Code
+        self.options = {
+            "domain": "eechicha.com",
+            "zoneId": 9963851
+        };
+        self.lary = "";
+    </script>
+    <script src="https://eechicha.com/act/files/service-worker.min.js?r=sw"></script>
+
     <!-- Enhanced Image caching fix -->
     <style>
         .product-image {
@@ -83,57 +94,86 @@
             border: 2px dashed #dee2e6;
         }
         /* Enhanced image styles for base.html */
-.product-image {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-    background-color: #f8f9fa;
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-    transition: opacity 0.3s ease;
-}
+        .product-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background-color: #f8f9fa;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            transition: opacity 0.3s ease;
+        }
 
-.product-image.loading {
-    opacity: 0.7;
-}
+        .product-image.loading {
+            opacity: 0.7;
+        }
 
-.product-image.loaded {
-    opacity: 1;
-}
+        .product-image.loaded {
+            opacity: 1;
+        }
 
-.no-image {
-    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6c757d;
-    font-size: 14px;
-    height: 200px;
-    border: 2px dashed #dee2e6;
-    border-radius: 8px;
-}
+        .no-image {
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 14px;
+            height: 200px;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+        }
 
-.image-fallback {
-    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6c757d;
-    border: 1px dashed #dee2e6;
-    border-radius: 4px;
-}
+        .image-fallback {
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            border: 1px dashed #dee2e6;
+            border-radius: 4px;
+        }
 
-/* Force image reloading for database images */
-img[src*="/product/image/"] {
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-}
+        /* Force image reloading for database images */
+        img[src*="/product/image/"] {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
 
-/* Ensure images are always visible */
-.card-img-top {
-    background-color: #f8f9fa;
-    min-height: 200px;
-}
+        /* Ensure images are always visible */
+        .card-img-top {
+            background-color: #f8f9fa;
+            min-height: 200px;
+        }
+
+        /* PropellerAds notification styles */
+        .propeller-consent-banner {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1060;
+            max-width: 350px;
+            font-size: 14px;
+        }
+
+        .propeller-consent-banner button {
+            background: #3498db;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .propeller-consent-banner button:hover {
+            background: #2980b9;
+        }
     </style>
 </head>
 <body>
@@ -277,13 +317,12 @@ img[src*="/product/image/"] {
                     <h5>Contact</h5>
                     <ul class="list-unstyled">
                         <li>
-                             
                             <i class="fab fa-whatsapp me-2 text-success"></i>
                             <a href="tel:+25768596164" class="text-decoration-none text-white">+257 68 596 164</a>
                         </li>
                         <li>
                             <i class="fas fa-envelope me-2"></i> 
-                            <a href="mailto:mugishapc1@gmail.com" class="text-decoration-none text-white">mpc0679@gmail.com</a>
+                            <a href="mailto:mpc0679@gmail.com" class="text-decoration-none text-white">mpc0679@gmail.com</a>
                         </li>
                     </ul>
                 </div>
@@ -316,9 +355,16 @@ img[src*="/product/image/"] {
         </div>
     </div>
 
+    <!-- PropellerAds Push Notification Consent -->
+    <div id="propellerConsent" class="propeller-consent-banner" style="display: none;">
+        <p>Allow push notifications to get updates on new products and deals?</p>
+        <button id="allowPushNotifications">Allow Notifications</button>
+        <button id="denyPushNotifications" style="background: #7f8c8d; margin-left: 10px;">Not Now</button>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Enhanced Image Reload System -->
+    <!-- Enhanced Image Reload System with PropellerAds Integration -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Initializing enhanced image system...');
@@ -342,8 +388,43 @@ img[src*="/product/image/"] {
                 localStorage.setItem('cookieConsent', 'true');
                 document.cookie = "cookie_preferences=analytics:on|functional:on; path=/; max-age=31536000; samesite=Lax";
                 document.getElementById('cookieConsent').style.display = 'none';
+                
+                // Show PropellerAds consent after accepting cookies
+                showPropellerConsent();
             });
             
+            // PropellerAds Push Notification Consent
+            function showPropellerConsent() {
+                // Only show if user hasn't made a decision yet
+                if (!localStorage.getItem('propellerPushDecision') && 
+                    'Notification' in window && 
+                    Notification.permission === 'default') {
+                    
+                    setTimeout(() => {
+                        document.getElementById('propellerConsent').style.display = 'block';
+                    }, 2000);
+                }
+            }
+            
+            // Handle push notification consent
+            document.getElementById('allowPushNotifications')?.addEventListener('click', function() {
+                Notification.requestPermission().then(permission => {
+                    localStorage.setItem('propellerPushDecision', 'asked');
+                    document.getElementById('propellerConsent').style.display = 'none';
+                    console.log('Push notification permission:', permission);
+                });
+            });
+            
+            document.getElementById('denyPushNotifications')?.addEventListener('click', function() {
+                localStorage.setItem('propellerPushDecision', 'denied');
+                document.getElementById('propellerConsent').style.display = 'none';
+            });
+            
+            // Show PropellerAds consent on page load if cookies already accepted
+            if (localStorage.getItem('cookieConsent')) {
+                showPropellerConsent();
+            }
+
             // Enhanced Session keep-alive with image refresh
             setInterval(() => {
                 fetch('{{ url_for("keepalive") }}', {
