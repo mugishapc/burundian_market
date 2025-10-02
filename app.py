@@ -35,14 +35,9 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True
 }
 
-# File-based image storage configuration
-UPLOAD_FOLDER = 'static/uploads'
-PAYMENT_PROOF_FOLDER = 'static/payment_proofs'
+# REMOVED file-based storage configuration since we're using database storage
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['PAYMENT_PROOF_FOLDER'] = PAYMENT_PROOF_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 # Email Configuration with timeout
@@ -83,7 +78,7 @@ def format_currency(value):
     except (ValueError, TypeError):
         return str(value)
 
-# Database Models
+# Database Models - UPDATED for image storage
 class User(db.Model):
     __tablename__ = 'users'
     
@@ -107,7 +102,8 @@ class User(db.Model):
     is_seller_active = db.Column(db.Boolean, default=True)
     subscription_start = db.Column(db.DateTime, nullable=True)
     subscription_end = db.Column(db.DateTime, nullable=True)
-    last_payment_proof = db.Column(db.String(200), nullable=True)
+    last_payment_proof = db.Column(db.Text, nullable=True)  # CHANGED: Store as base64 in database
+    last_payment_proof_filename = db.Column(db.String(200), nullable=True)  # NEW: Store filename
     last_active = db.Column(db.DateTime, default=db.func.current_timestamp(), 
                            onupdate=db.func.current_timestamp())
     
@@ -117,7 +113,8 @@ class User(db.Model):
     # New field for pending subscription
     has_pending_subscription = db.Column(db.Boolean, default=False)
     pending_subscription_days = db.Column(db.Integer, nullable=True)
-    pending_payment_proof = db.Column(db.String(200), nullable=True)
+    pending_payment_proof = db.Column(db.Text, nullable=True)  # CHANGED: Store as base64 in database
+    pending_payment_proof_filename = db.Column(db.String(200), nullable=True)  # NEW: Store filename
     
     def is_active(self):
         """Check if user session should still be valid"""
@@ -160,6 +157,7 @@ class Product(db.Model):
     category = db.Column(db.String(50), nullable=True)
     image_data = db.Column(db.Text, nullable=True)  # Store base64 encoded image
     image_filename = db.Column(db.String(200), nullable=True)
+    image_mimetype = db.Column(db.String(100), nullable=True)  # NEW: Store mimetype
     seller_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     
@@ -175,7 +173,9 @@ class SubscriptionRequest(db.Model):
     seller_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     subscription_days = db.Column(db.Integer, nullable=False)
     amount = db.Column(db.Float, nullable=False)
-    payment_proof_filename = db.Column(db.String(200), nullable=False)
+    payment_proof_data = db.Column(db.Text, nullable=True)  # CHANGED: Store as base64 in database
+    payment_proof_filename = db.Column(db.String(200), nullable=True)  # Keep filename
+    payment_proof_mimetype = db.Column(db.String(100), nullable=True)  # NEW: Store mimetype
     status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     processed_at = db.Column(db.DateTime, nullable=True)
@@ -207,7 +207,11 @@ def initialize_database():
                 
                 # Check if new columns exist in users table
                 users_columns = [col['name'] for col in inspector.get_columns('users')]
-                new_columns = ['has_pending_subscription', 'pending_subscription_days', 'pending_payment_proof']
+                new_columns = [
+                    'has_pending_subscription', 'pending_subscription_days', 
+                    'pending_payment_proof', 'pending_payment_proof_filename',
+                    'last_payment_proof_filename', 'image_mimetype'
+                ]
                 
                 for column in new_columns:
                     if column not in users_columns:
@@ -219,11 +223,43 @@ def initialize_database():
                                 elif column == 'pending_subscription_days':
                                     conn.execute(text('ALTER TABLE users ADD COLUMN pending_subscription_days INTEGER'))
                                 elif column == 'pending_payment_proof':
-                                    conn.execute(text('ALTER TABLE users ADD COLUMN pending_payment_proof VARCHAR(200)'))
+                                    conn.execute(text('ALTER TABLE users ADD COLUMN pending_payment_proof TEXT'))
+                                elif column == 'pending_payment_proof_filename':
+                                    conn.execute(text('ALTER TABLE users ADD COLUMN pending_payment_proof_filename VARCHAR(200)'))
+                                elif column == 'last_payment_proof_filename':
+                                    conn.execute(text('ALTER TABLE users ADD COLUMN last_payment_proof_filename VARCHAR(200)'))
+                                elif column == 'image_mimetype':
+                                    # This should be in products table, not users
+                                    pass
                                 conn.commit()
                             print(f"✅ Added {column} column")
                         except Exception as e:
                             print(f"⚠️  Could not add {column}: {e}")
+                
+                # Check products table for image_mimetype
+                products_columns = [col['name'] for col in inspector.get_columns('products')]
+                if 'image_mimetype' not in products_columns:
+                    print("🔄 Adding image_mimetype to products table...")
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE products ADD COLUMN image_mimetype VARCHAR(100)'))
+                            conn.commit()
+                        print("✅ Added image_mimetype column to products")
+                    except Exception as e:
+                        print(f"⚠️  Could not add image_mimetype to products: {e}")
+                
+                # Check subscription_requests table for new columns
+                subreq_columns = [col['name'] for col in inspector.get_columns('subscription_requests')]
+                if 'payment_proof_data' not in subreq_columns:
+                    print("🔄 Adding payment_proof_data to subscription_requests table...")
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE subscription_requests ADD COLUMN payment_proof_data TEXT'))
+                            conn.execute(text('ALTER TABLE subscription_requests ADD COLUMN payment_proof_mimetype VARCHAR(100)'))
+                            conn.commit()
+                        print("✅ Added payment_proof_data and payment_proof_mimetype columns")
+                    except Exception as e:
+                        print(f"⚠️  Could not add columns to subscription_requests: {e}")
                 
                 # Create admin user if not exists - using safer approach
                 try:
@@ -266,11 +302,6 @@ def initialize_database():
                     print("✅ Admin user created")
                 except Exception as e:
                     print(f"⚠️  Could not create admin user: {e}")
-            
-            # Create uploads directories
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            os.makedirs(app.config['PAYMENT_PROOF_FOLDER'], exist_ok=True)
-            print("✅ Upload directories created")
             
             print("🎉 Database initialized successfully!")
             
@@ -483,19 +514,19 @@ def startup_tasks():
         check_all_subscriptions()
         startup_done = True
 
-# FILE-BASED IMAGE HANDLING FUNCTIONS
+# DATABASE-BASED IMAGE HANDLING FUNCTIONS (REPLACED FILE-BASED)
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def save_image_file(image_file, folder='uploads'):
-    """Save image as file and return filename"""
+def save_image_to_db(image_file, folder='uploads'):
+    """Save image as base64 in database and return data"""
     if not image_file or image_file.filename == '':
-        return None
+        return None, None, None
     
     if not allowed_file(image_file.filename):
         flash('Invalid file type. Please upload PNG, JPG, JPEG, GIF, or WEBP images.', 'danger')
-        return None
+        return None, None, None
     
     try:
         # Check file size
@@ -505,82 +536,104 @@ def save_image_file(image_file, folder='uploads'):
         
         if file_size > MAX_FILE_SIZE:
             flash('Image file is too large. Maximum size is 5MB.', 'danger')
-            return None
+            return None, None, None
         
-        # Generate secure filename
+        # Read file data and encode as base64
+        file_data = image_file.read()
+        base64_data = base64.b64encode(file_data).decode('utf-8')
+        
+        # Get mimetype
+        mimetype = image_file.mimetype
+        
+        # Generate secure filename for reference
         filename = secure_filename(image_file.filename)
-        # Add timestamp to make filename unique
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_")
         filename = timestamp + filename
         
-        # Determine folder path
-        if folder == 'payment_proofs':
-            folder_path = app.config['PAYMENT_PROOF_FOLDER']
-        else:
-            folder_path = app.config['UPLOAD_FOLDER']
-        
-        # Save file
-        filepath = os.path.join(folder_path, filename)
-        image_file.save(filepath)
-        
-        print(f"✅ File saved: {filename} in {folder}")
-        return filename
+        print(f"✅ Image saved to database: {filename} ({mimetype})")
+        return base64_data, filename, mimetype
         
     except Exception as e:
-        print(f"❌ Error saving file: {e}")
-        flash('Error saving file. Please try again.', 'danger')
-        return None
+        print(f"❌ Error saving image to database: {e}")
+        flash('Error saving image. Please try again.', 'danger')
+        return None, None, None
 
 def get_image_url(product):
-    """Get image URL for product - uses file path"""
-    if not product or not product.image_filename:
-        return None
-    
-    image_url = url_for('static', filename=f'uploads/{product.image_filename}')
-    return image_url
-
-def get_payment_proof_url(filename):
-    """Get payment proof URL"""
-    if not filename:
-        return None
-    
-    return url_for('static', filename=f'payment_proofs/{filename}')
-
-def convert_base64_to_file(product):
-    """Convert base64 image data to file storage"""
+    """Get image URL for product - serves from database via route"""
     if not product or not product.image_data:
-        return False
+        return url_for('static', filename='images/placeholder.jpg')  # Default placeholder
+    
+    return url_for('get_product_image', product_id=product.id)
+
+def get_payment_proof_url(subscription_request):
+    """Get payment proof URL - serves from database via route"""
+    if not subscription_request or not subscription_request.payment_proof_data:
+        return None
+    
+    return url_for('get_payment_proof', request_id=subscription_request.id)
+
+# Routes for serving images from database
+@app.route('/product/image/<int:product_id>')
+def get_product_image(product_id):
+    """Serve product image from database"""
+    product = db.session.query(Product).get_or_404(product_id)
+    
+    if not product.image_data:
+        # Return default image if no image data
+        return redirect(url_for('static', filename='images/placeholder.jpg'))
     
     try:
-        # Decode base64 data
-        image_bytes = base64.b64decode(product.image_data)
+        # Decode base64 image data
+        image_data = base64.b64decode(product.image_data)
         
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        extension = 'jpg'  # default
-        if product.image_filename:
-            ext = product.image_filename.lower().split('.')[-1]
-            if ext in ALLOWED_EXTENSIONS:
-                extension = ext
+        # Determine mimetype
+        mimetype = product.image_mimetype or 'image/jpeg'
         
-        filename = f"{timestamp}_{product.id}.{extension}"
-        filename = secure_filename(filename)
+        # Create response with image data
+        response = make_response(image_data)
+        response.headers.set('Content-Type', mimetype)
+        response.headers.set('Content-Disposition', 'inline', filename=product.image_filename or 'product.jpg')
         
-        # Save file
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        with open(filepath, 'wb') as f:
-            f.write(image_bytes)
+        # Cache for 1 hour
+        response.headers.set('Cache-Control', 'public, max-age=3600')
         
-        # Update product
-        product.image_filename = filename
-        product.image_data = None  # Remove base64 data
-        
-        print(f"✅ Converted base64 to file: {product.title} -> {filename}")
-        return True
-        
+        return response
     except Exception as e:
-        print(f"❌ Error converting base64 to file for {product.title}: {e}")
-        return False
+        print(f"Error serving product image {product_id}: {e}")
+        return redirect(url_for('static', filename='images/placeholder.jpg'))
+
+@app.route('/payment-proof/<int:request_id>')
+def get_payment_proof(request_id):
+    """Serve payment proof image from database"""
+    if 'user_id' not in session:
+        abort(403)
+    
+    subscription_request = db.session.query(SubscriptionRequest).get_or_404(request_id)
+    
+    # Check permissions: admin or the seller who owns the request
+    user = db.session.query(User).get(session['user_id'])
+    if user.user_type != 'admin' and subscription_request.seller_id != user.id:
+        abort(403)
+    
+    if not subscription_request.payment_proof_data:
+        abort(404)
+    
+    try:
+        # Decode base64 image data
+        image_data = base64.b64decode(subscription_request.payment_proof_data)
+        
+        # Determine mimetype
+        mimetype = subscription_request.payment_proof_mimetype or 'image/jpeg'
+        
+        # Create response with image data
+        response = make_response(image_data)
+        response.headers.set('Content-Type', mimetype)
+        response.headers.set('Content-Disposition', 'inline', filename=subscription_request.payment_proof_filename or 'payment_proof.jpg')
+        
+        return response
+    except Exception as e:
+        print(f"Error serving payment proof {request_id}: {e}")
+        abort(404)
 
 # Routes
 @app.route('/')
@@ -958,13 +1011,13 @@ def add_product():
         price = float(request.form['price'])
         category = request.form.get('category')
         
-        # Handle image upload - store as FILE
+        # Handle image upload - store as BASE64 in DATABASE
         image = request.files.get('image')
-        image_filename = None
+        image_data, image_filename, image_mimetype = None, None, None
         
         if image and image.filename != '':
-            image_filename = save_image_file(image)
-            if not image_filename:
+            image_data, image_filename, image_mimetype = save_image_to_db(image)
+            if not image_data:
                 return redirect(url_for('add_product'))
         
         # Validate required fields
@@ -981,8 +1034,9 @@ def add_product():
             description=description,
             price=price,
             category=category,
-            image_data=None,  # Don't store base64
-            image_filename=image_filename,  # Store filename
+            image_data=image_data,  # Store base64 data in database
+            image_filename=image_filename,  # Store filename for reference
+            image_mimetype=image_mimetype,  # Store mimetype
             seller_id=session['user_id']
         )
         
@@ -1171,19 +1225,14 @@ def edit_product(product_id):
         product.price = float(request.form['price'])
         product.category = request.form.get('category')
         
-        # Handle image update
+        # Handle image update - store as BASE64 in DATABASE
         image = request.files.get('image')
         if image and image.filename != '':
-            image_filename = save_image_file(image)
-            if image_filename:
-                # Delete old image file if exists
-                if product.image_filename:
-                    old_filepath = os.path.join(app.config['UPLOAD_FOLDER'], product.image_filename)
-                    if os.path.exists(old_filepath):
-                        os.remove(old_filepath)
-                
+            image_data, image_filename, image_mimetype = save_image_to_db(image)
+            if image_data:
+                product.image_data = image_data
                 product.image_filename = image_filename
-                product.image_data = None  # Ensure no base64 data
+                product.image_mimetype = image_mimetype
             else:
                 return redirect(url_for('edit_product', product_id=product_id))
         
@@ -1205,12 +1254,7 @@ def delete_product(product_id):
     if product.seller_id != session['user_id']:
         abort(403)  # Forbidden for other sellers
     
-    # Delete image file if exists
-    if product.image_filename:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], product.image_filename)
-        if os.path.exists(filepath):
-            os.remove(filepath)
-    
+    # No need to delete files since images are stored in database
     db.session.delete(product)
     db.session.commit()
     flash('Product deleted successfully', 'success')
@@ -1350,13 +1394,6 @@ def admin_delete_user(user_id):
     try:
         # Delete user's products first (if seller)
         if user.user_type == 'seller':
-            products = Product.query.filter_by(seller_id=user.id).all()
-            for product in products:
-                # Delete image files
-                if product.image_filename:
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], product.image_filename)
-                    if os.path.exists(filepath):
-                        os.remove(filepath)
             Product.query.filter_by(seller_id=user.id).delete()
         
         # Delete subscription requests
@@ -1403,7 +1440,8 @@ def admin_approve_subscription(request_id):
         seller.is_seller_active = True
         seller.subscription_start = datetime.now()
         seller.subscription_end = datetime.now() + timedelta(days=subscription_request.subscription_days)
-        seller.last_payment_proof = subscription_request.payment_proof_filename
+        seller.last_payment_proof = subscription_request.payment_proof_data  # Store base64 data
+        seller.last_payment_proof_filename = subscription_request.payment_proof_filename
         seller.has_pending_subscription = False
         
         # Update subscription request
@@ -1598,9 +1636,9 @@ def submit_subscription():
         flash('Please upload your payment proof (borderaux)', 'danger')
         return redirect(url_for('seller_subscribe'))
     
-    # Save payment proof
-    payment_proof_filename = save_image_file(payment_proof, 'payment_proofs')
-    if not payment_proof_filename:
+    # Save payment proof to database
+    payment_proof_data, payment_proof_filename, payment_proof_mimetype = save_image_to_db(payment_proof, 'payment_proofs')
+    if not payment_proof_data:
         return redirect(url_for('seller_subscribe'))
     
     try:
@@ -1609,14 +1647,17 @@ def submit_subscription():
             seller_id=user.id,
             subscription_days=int(period),
             amount=periods[period],
+            payment_proof_data=payment_proof_data,  # Store base64 data
             payment_proof_filename=payment_proof_filename,
+            payment_proof_mimetype=payment_proof_mimetype,
             status='pending'
         )
         
         # Update user pending status
         user.has_pending_subscription = True
         user.pending_subscription_days = int(period)
-        user.pending_payment_proof = payment_proof_filename
+        user.pending_payment_proof = payment_proof_data  # Store base64 data
+        user.pending_payment_proof_filename = payment_proof_filename
         
         db.session.add(subscription_request)
         db.session.commit()
@@ -1633,7 +1674,7 @@ def submit_subscription():
         flash('Error submitting subscription request. Please try again.', 'danger')
         return redirect(url_for('seller_subscribe'))
 
-# Convert base64 images to files
+# Convert base64 images to files (legacy function - kept for compatibility)
 @app.route('/convert-all-images')
 def convert_all_images():
     if 'user_id' not in session or session.get('user_type') != 'seller':
@@ -1645,14 +1686,14 @@ def convert_all_images():
     converted_count = 0
     for product in products:
         if product.image_data and not product.image_filename:
-            if convert_base64_to_file(product):
-                converted_count += 1
+            # This is now just for legacy compatibility
+            # Images are now stored in database only
+            converted_count += 1
     
     if converted_count > 0:
-        db.session.commit()
-        flash(f'Converted {converted_count} images from base64 to files!', 'success')
+        flash(f'Found {converted_count} images stored in database!', 'success')
     else:
-        flash('No base64 images found to convert.', 'info')
+        flash('No images found to convert.', 'info')
     
     return redirect(url_for('seller_dashboard'))
 

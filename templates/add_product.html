@@ -2,169 +2,138 @@
 {% block title %}Add Product{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-success text-white">
-                <h4 class="card-title mb-0"><i class="fas fa-plus me-2"></i>Add New Product</h4>
-            </div>
-            <div class="card-body">
-                <form method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    
-                    <div class="mb-3">
-                        <label for="title" class="form-label">Product Title *</label>
-                        <input type="text" class="form-control" id="title" name="title" required 
-                               placeholder="Enter product title">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="4" 
-                                  placeholder="Enter product description"></textarea>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="price" class="form-label">Price (BIF) *</label>
-                                <input type="number" class="form-control" id="price" name="price" 
-                                       step="0.01" min="0" required placeholder="0.00">
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h3 class="text-center">Add New Product</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('add_product') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Product Title *</label>
+                            <input type="text" class="form-control" id="title" name="title" required 
+                                   placeholder="Enter product title">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" 
+                                      placeholder="Describe your product..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="price" class="form-label">Price (BIF) *</label>
+                            <input type="number" class="form-control" id="price" name="price" 
+                                   min="1" step="0.01" required placeholder="Enter price">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Category</label>
+                            <input type="text" class="form-control" id="category" name="category" 
+                                   placeholder="e.g., Electronics, Clothing, Food">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="image" class="form-label">Product Image</label>
+                            <input type="file" class="form-control" id="image" name="image" 
+                                   accept=".jpg,.jpeg,.png,.gif,.webp">
+                            <div class="form-text">
+                                Supported formats: JPG, PNG, GIF, WEBP (Max: 5MB). 
+                                Images are stored securely in our database.
+                            </div>
+                            
+                            <!-- Image Preview -->
+                            <div class="mt-3" id="imagePreviewContainer" style="display: none;">
+                                <p class="mb-2"><strong>Image Preview:</strong></p>
+                                <img id="imagePreview" class="img-thumbnail" style="max-height: 200px;">
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="category" class="form-label">Category</label>
-                                <input type="text" class="form-control" id="category" name="category" 
-                                       placeholder="e.g., Electronics, Clothing, Food">
-                            </div>
+                        
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle me-2"></i>Important:</h6>
+                            <ul class="mb-0 small">
+                                <li>Fields marked with * are required</li>
+                                <li>Images are stored securely in our database and won't be lost</li>
+                                <li>Your product will be visible to all buyers immediately</li>
+                                <li>Make sure your contact information is up to date</li>
+                            </ul>
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="image" class="form-label">Product Image</label>
-                        <input type="file" class="form-control" id="image" name="image" 
-                               accept=".jpg,.jpeg,.png,.gif,.webp">
-                        <div class="form-text">
-                            Supported formats: JPG, JPEG, PNG, GIF, WEBP. Max size: 5MB.
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('seller_dashboard') }}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-arrow-left me-1"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-plus me-1"></i>Add Product
+                            </button>
                         </div>
-                    </div>
-                    
-                    <!-- Image Preview -->
-                    <div class="mb-3" id="image-preview-container" style="display: none;">
-                        <label class="form-label">Image Preview</label>
-                        <div class="border rounded p-3 text-center">
-                            <img id="image-preview" src="#" alt="Preview" 
-                                 style="max-height: 200px; max-width: 100%; display: none;">
-                            <div id="no-preview" class="text-muted">
-                                <i class="fas fa-image fa-2x mb-2"></i>
-                                <p class="mb-0">Image preview will appear here</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success btn-lg">
-                            <i class="fas fa-save me-2"></i>Add Product
-                        </button>
-                        <a href="{{ url_for('seller_dashboard') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                        </a>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Help Card -->
-        <div class="card mt-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="card-title mb-0"><i class="fas fa-lightbulb me-2"></i>Tips for Better Sales</h5>
-            </div>
-            <div class="card-body">
-                <ul class="mb-0">
-                    <li>Use clear, high-quality images of your product</li>
-                    <li>Write detailed and honest descriptions</li>
-                    <li>Set competitive prices based on market research</li>
-                    <li>Choose relevant categories for better visibility</li>
-                </ul>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const imageInput = document.getElementById('image');
-    const previewContainer = document.getElementById('image-preview-container');
-    const imagePreview = document.getElementById('image-preview');
-    const noPreview = document.getElementById('no-preview');
+// Image preview functionality
+document.getElementById('image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const preview = document.getElementById('imagePreview');
+    const previewContainer = document.getElementById('imagePreviewContainer');
     
-    imageInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
         
-        if (file) {
-            // Validate file type
-            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-            if (!validTypes.includes(file.type)) {
-                alert('Please select a valid image file (JPEG, PNG, GIF, WEBP)');
-                this.value = '';
-                previewContainer.style.display = 'none';
-                return;
-            }
-            
-            // Validate file size (5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                alert('Image size should be less than 5MB');
-                this.value = '';
-                previewContainer.style.display = 'none';
-                return;
-            }
-            
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                previewContainer.style.display = 'block';
-                imagePreview.src = event.target.result;
-                imagePreview.style.display = 'block';
-                noPreview.style.display = 'none';
-            };
-            reader.readAsDataURL(file);
-        } else {
-            previewContainer.style.display = 'none';
-            imagePreview.style.display = 'none';
-            noPreview.style.display = 'block';
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            previewContainer.style.display = 'block';
         }
-    });
+        
+        reader.readAsDataURL(file);
+    } else {
+        previewContainer.style.display = 'none';
+    }
+});
+
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const price = document.getElementById('price').value;
+    const title = document.getElementById('title').value;
     
-    // Form validation
-    const form = document.querySelector('form');
-    form.addEventListener('submit', function(e) {
-        const price = parseFloat(document.getElementById('price').value);
-        if (price <= 0) {
-            e.preventDefault();
-            alert('Price must be greater than 0');
-            return;
-        }
-    });
+    if (!title.trim()) {
+        e.preventDefault();
+        alert('Please enter a product title');
+        return;
+    }
+    
+    if (price <= 0) {
+        e.preventDefault();
+        alert('Price must be greater than 0');
+        return;
+    }
+    
+    // Show loading state
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding Product...';
+    submitBtn.disabled = true;
 });
 </script>
 
 <style>
 .card {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    border: 1px solid rgba(0, 0, 0, 0.125);
-}
-
-.card-header {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .form-label {
-    font-weight: 500;
-    margin-bottom: 0.5rem;
+    font-weight: 600;
 }
 
-.btn {
-    border-radius: 0.375rem;
+.alert {
+    border-left: 4px solid #17a2b8;
 }
 </style>
 {% endblock %}
