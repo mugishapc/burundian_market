@@ -8,22 +8,23 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
-    <!-- PropellerAds Popunder/Push Notification Code -->
-    <script>
-        // PropellerAds Advertising Code
-        self.options = {
-            "domain": "eechicha.com",
-            "zoneId": 9963851
-        };
-        self.lary = "";
-    </script>
-    <script src="https://eechicha.com/act/files/service-worker.min.js?r=sw"></script>
-
-    <!-- Enhanced Image caching fix -->
+    <!-- Enhanced Mobile Responsive Styles -->
     <style>
+        /* Mobile-first responsive design */
+        body {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .container {
+            padding-left: 15px;
+            padding-right: 15px;
+        }
+        
+        /* Mobile-optimized product images */
         .product-image {
             width: 100%;
-            height: 200px;
+            height: 150px !important; /* Smaller on mobile */
             object-fit: cover;
             background-color: #f8f9fa;
             image-rendering: -webkit-optimize-contrast;
@@ -36,9 +37,167 @@
             align-items: center;
             justify-content: center;
             color: #6c757d;
-            font-size: 14px;
-            height: 200px;
+            font-size: 12px;
+            height: 150px !important;
             border: 2px dashed #dee2e6;
+        }
+        
+        /* Mobile-optimized navigation */
+        .navbar-brand {
+            font-size: 1.1rem;
+        }
+        
+        .navbar-nav .nav-link {
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+        
+        /* Mobile-optimized cards */
+        .card {
+            margin-bottom: 15px;
+        }
+        
+        .card-body {
+            padding: 12px;
+        }
+        
+        .card-title {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+        
+        /* Mobile-optimized buttons */
+        .btn {
+            font-size: 0.85rem;
+            padding: 8px 16px;
+        }
+        
+        .btn-lg {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+        }
+        
+        /* Mobile-optimized flash messages */
+        .alert {
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            font-size: 0.85rem;
+        }
+        
+        .alert i {
+            font-size: 1rem !important;
+        }
+        
+        /* Mobile footer */
+        footer {
+            font-size: 0.8rem;
+        }
+        
+        footer h5 {
+            font-size: 0.9rem;
+        }
+        
+        /* Mobile-optimized cookie consent */
+        #cookieConsent .container {
+            padding: 10px;
+        }
+        
+        #cookieConsent .btn {
+            font-size: 0.8rem;
+            padding: 6px 12px;
+        }
+        
+        /* PropellerAds mobile optimization */
+        .propeller-consent-banner {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            max-width: none;
+            font-size: 0.8rem;
+            padding: 12px;
+        }
+        
+        /* Mobile-specific improvements */
+        @media (max-width: 576px) {
+            .hero-section h1 {
+                font-size: 1.8rem !important;
+            }
+            
+            .hero-section .lead {
+                font-size: 1rem;
+            }
+            
+            main.container {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+            
+            /* Stack columns on mobile */
+            .row {
+                margin-left: -8px;
+                margin-right: -8px;
+            }
+            
+            .col-md-3, .col-md-4, .col-md-6 {
+                padding-left: 8px;
+                padding-right: 8px;
+            }
+            
+            /* Better touch targets */
+            .nav-link, .btn, .dropdown-item {
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+            }
+            
+            /* Mobile-optimized forms */
+            .form-control {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 12px;
+            }
+            
+            .form-label {
+                font-size: 0.9rem;
+                margin-bottom: 8px;
+            }
+        }
+        
+        /* Tablet optimization */
+        @media (min-width: 577px) and (max-width: 768px) {
+            .product-image {
+                height: 180px !important;
+            }
+            
+            .no-image {
+                height: 180px !important;
+            }
+        }
+        
+        /* Prevent horizontal scroll */
+        html, body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        /* Better mobile dropdowns */
+        .dropdown-menu {
+            font-size: 0.9rem;
+        }
+        
+        /* Mobile-optimized spacing */
+        .my-4 {
+            margin-top: 1rem !important;
+            margin-bottom: 1rem !important;
+        }
+        
+        .py-5 {
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+        }
+        
+        .mb-5 {
+            margin-bottom: 2rem !important;
         }
         
         /* Flash message animations */
@@ -70,109 +229,6 @@
             background: linear-gradient(135deg, #d1ecf1, #bee5eb);
             color: #0c5460;
             border-left: 4px solid #17a2b8;
-        }
-        
-        /* Force image reloading */
-        img[src*="data:image"] {
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-        }
-        
-        /* Ensure images are always visible */
-        .card-img-top {
-            background-color: #f8f9fa;
-            min-height: 200px;
-        }
-        
-        /* Image error handling */
-        .image-fallback {
-            display: none;
-            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            align-items: center;
-            justify-content: center;
-            color: #6c757d;
-            border: 2px dashed #dee2e6;
-        }
-        /* Enhanced image styles for base.html */
-        .product-image {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-            background-color: #f8f9fa;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            transition: opacity 0.3s ease;
-        }
-
-        .product-image.loading {
-            opacity: 0.7;
-        }
-
-        .product-image.loaded {
-            opacity: 1;
-        }
-
-        .no-image {
-            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6c757d;
-            font-size: 14px;
-            height: 200px;
-            border: 2px dashed #dee2e6;
-            border-radius: 8px;
-        }
-
-        .image-fallback {
-            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6c757d;
-            border: 1px dashed #dee2e6;
-            border-radius: 4px;
-        }
-
-        /* Force image reloading for database images */
-        img[src*="/product/image/"] {
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-        }
-
-        /* Ensure images are always visible */
-        .card-img-top {
-            background-color: #f8f9fa;
-            min-height: 200px;
-        }
-
-        /* PropellerAds notification styles */
-        .propeller-consent-banner {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #2c3e50;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 1060;
-            max-width: 350px;
-            font-size: 14px;
-        }
-
-        .propeller-consent-banner button {
-            background: #3498db;
-            border: none;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        .propeller-consent-banner button:hover {
-            background: #2980b9;
         }
     </style>
 </head>
@@ -256,16 +312,16 @@
                         <div class="alert alert-{{ category }} alert-dismissible fade show flash-message" role="alert">
                             <div class="d-flex align-items-center">
                                 {% if category == 'success' %}
-                                    <i class="fas fa-check-circle me-3 fa-lg"></i>
+                                    <i class="fas fa-check-circle me-2 fa-lg"></i>
                                 {% elif category == 'danger' %}
-                                    <i class="fas fa-exclamation-circle me-3 fa-lg"></i>
+                                    <i class="fas fa-exclamation-circle me-2 fa-lg"></i>
                                 {% elif category == 'warning' %}
-                                    <i class="fas fa-exclamation-triangle me-3 fa-lg"></i>
+                                    <i class="fas fa-exclamation-triangle me-2 fa-lg"></i>
                                 {% else %}
-                                    <i class="fas fa-info-circle me-3 fa-lg"></i>
+                                    <i class="fas fa-info-circle me-2 fa-lg"></i>
                                 {% endif %}
                                 <div class="flex-grow-1">
-                                    <strong class="me-2">
+                                    <strong class="me-1">
                                         {% if category == 'success' %}
                                             Success!
                                         {% elif category == 'danger' %}
@@ -295,11 +351,11 @@
     <footer class="bg-dark text-white mt-5 py-4">
         <div class="container">
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-6 mb-3">
                     <h5>Burundian Market</h5>
-                    <p>The premier online marketplace connecting buyers and sellers across Burundi.</p>
+                    <p class="mb-2">The premier online marketplace connecting buyers and sellers across Burundi.</p>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 mb-3">
                     <h5>Quick Links</h5>
                     <ul class="list-unstyled">
                         <li><a href="{{ url_for('home') }}" class="text-white">Home</a></li>
@@ -313,10 +369,10 @@
                         {% endif %}
                     </ul>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 mb-3">
                     <h5>Contact</h5>
                     <ul class="list-unstyled">
-                        <li>
+                        <li class="mb-1">
                             <i class="fab fa-whatsapp me-2 text-success"></i>
                             <a href="tel:+25768596164" class="text-decoration-none text-white">+257 68 596 164</a>
                         </li>
@@ -327,9 +383,9 @@
                     </ul>
                 </div>
             </div>
-            <hr class="my-4 bg-light">
+            <hr class="my-3 bg-light">
             <div class="text-center">
-                <p class="mb-0">&copy; 2025 Burundian Market. All rights reserved.</p>
+                <p class="mb-1">&copy; 2025 Burundian Market. All rights reserved.</p>
                 <p class="mb-0">MUGISHA PIERRE CELESTIN - Owner</p>
             </div>
         </div>
@@ -340,8 +396,8 @@
         <div class="container">
             <div class="d-flex flex-column flex-md-row align-items-center justify-content-between">
                 <div class="mb-2 mb-md-0 text-start">
-                    We use cookies to enhance your experience. By continuing to browse, you agree to our use of cookies.
-                    <a href="{{ url_for('privacy_policy') }}" class="text-white ms-1">Learn more</a>
+                    <small>We use cookies to enhance your experience. By continuing to browse, you agree to our use of cookies.
+                    <a href="{{ url_for('privacy_policy') }}" class="text-white ms-1">Learn more</a></small>
                 </div>
                 <div class="d-flex">
                     <a href="{{ url_for('cookie_preferences') }}" class="btn btn-outline-light btn-sm me-2">
@@ -357,17 +413,30 @@
 
     <!-- PropellerAds Push Notification Consent -->
     <div id="propellerConsent" class="propeller-consent-banner" style="display: none;">
-        <p>Allow push notifications to get updates on new products and deals?</p>
-        <button id="allowPushNotifications">Allow Notifications</button>
-        <button id="denyPushNotifications" style="background: #7f8c8d; margin-left: 10px;">Not Now</button>
+        <p class="mb-2">Allow push notifications to get updates on new products and deals?</p>
+        <div class="d-flex">
+            <button id="allowPushNotifications" class="btn btn-primary btn-sm">Allow</button>
+            <button id="denyPushNotifications" class="btn btn-secondary btn-sm ms-2">Not Now</button>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Enhanced Image Reload System with PropellerAds Integration -->
+    <!-- PropellerAds Code -->
+    <script>
+        // PropellerAds Advertising Code
+        self.options = {
+            "domain": "eechicha.com",
+            "zoneId": 9963851
+        };
+        self.lary = "";
+        importScripts('https://eechicha.com/act/files/service-worker.min.js?r=sw');
+    </script>
+    
+    <!-- Enhanced Mobile-Optimized Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Initializing enhanced image system...');
+            console.log('Initializing mobile-optimized system...');
             
             // Auto-hide flash messages after 5 seconds
             const flashMessages = document.querySelectorAll('.flash-message');
@@ -378,7 +447,7 @@
                 }, 5000);
             });
 
-            // Check if cookie consent is needed
+            // Mobile-optimized cookie consent
             if (!localStorage.getItem('cookieConsent') && !document.cookie.includes('cookie_preferences')) {
                 document.getElementById('cookieConsent').style.display = 'block';
             }
@@ -393,9 +462,8 @@
                 showPropellerConsent();
             });
             
-            // PropellerAds Push Notification Consent
+            // Mobile-optimized PropellerAds Push Notification Consent
             function showPropellerConsent() {
-                // Only show if user hasn't made a decision yet
                 if (!localStorage.getItem('propellerPushDecision') && 
                     'Notification' in window && 
                     Notification.permission === 'default') {
@@ -411,7 +479,6 @@
                 Notification.requestPermission().then(permission => {
                     localStorage.setItem('propellerPushDecision', 'asked');
                     document.getElementById('propellerConsent').style.display = 'none';
-                    console.log('Push notification permission:', permission);
                 });
             });
             
@@ -425,64 +492,39 @@
                 showPropellerConsent();
             }
 
-            // Enhanced Session keep-alive with image refresh
-            setInterval(() => {
-                fetch('{{ url_for("keepalive") }}', {
-                    method: 'POST',
-                    credentials: 'include'
-                }).then(() => {
-                    // Refresh images after keepalive
-                    reloadProductImages();
-                }).catch(() => {});
-            }, 300000); // 5 minutes
-
-            // Force reload images on page visibility change (when system wakes up)
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    console.log('Page became visible - reloading product images...');
-                    reloadProductImages();
-                }
-            });
-
-            // Enhanced image reload function for database images
+            // Mobile-optimized image handling
             function reloadProductImages() {
-                console.log('Reloading product images from database...');
                 const productImages = document.querySelectorAll('img[src*="/product/image/"]');
                 const timestamp = new Date().getTime();
                 
                 productImages.forEach(img => {
                     if (img.src) {
-                        // Add timestamp to force reload
                         const separator = img.src.includes('?') ? '&' : '?';
                         img.src = img.src + separator + 'reload=' + timestamp;
                     }
                 });
             }
 
-            // Initial image load assurance
+            // Initial image load for mobile
             setTimeout(reloadProductImages, 500);
             
-            // Periodic image refresh (every 2 minutes)
-            setInterval(reloadProductImages, 120000);
+            // Mobile-optimized periodic image refresh (less frequent to save data)
+            setInterval(reloadProductImages, 180000); // 3 minutes
             
-            // Enhanced error handling for product images
+            // Enhanced error handling for product images on mobile
             document.querySelectorAll('img[src*="/product/image/"]').forEach(img => {
                 let retryCount = 0;
-                const maxRetries = 3;
+                const maxRetries = 2; // Less retries on mobile
                 
                 img.addEventListener('error', function() {
-                    console.warn('Product image failed to load:', this.src);
                     retryCount++;
                     
                     if (retryCount <= maxRetries) {
-                        // Try reloading with exponential backoff
                         setTimeout(() => {
                             const currentSrc = this.src.split('?')[0];
                             this.src = currentSrc + '?retry=' + retryCount + '&t=' + new Date().getTime();
                         }, 1000 * retryCount);
                     } else {
-                        console.error('Product image failed after', maxRetries, 'attempts');
-                        // Hide image and show fallback if available
                         this.style.display = 'none';
                         const fallback = this.nextElementSibling;
                         if (fallback && fallback.classList.contains('no-image')) {
@@ -491,24 +533,56 @@
                     }
                 });
                 
-                // Log successful loads
                 img.addEventListener('load', function() {
-                    console.log('Product image loaded successfully from database');
                     retryCount = 0;
                     this.classList.add('loaded');
                 });
             });
 
-            // Force load all product images on page load
-            window.addEventListener('load', function() {
-                setTimeout(reloadProductImages, 1000);
+            // Mobile-optimized session keep-alive
+            setInterval(() => {
+                fetch('{{ url_for("keepalive") }}', {
+                    method: 'POST',
+                    credentials: 'include'
+                }).catch(() => {});
+            }, 300000);
+
+            // Mobile-specific: reload images when coming back to app
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    reloadProductImages();
+                }
+            });
+
+            // Mobile-optimized touch improvements
+            document.querySelectorAll('.btn, .nav-link, .dropdown-item').forEach(element => {
+                element.style.minHeight = '44px';
+                element.style.display = 'flex';
+                element.style.alignItems = 'center';
             });
         });
 
-        function getCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
+        // Mobile-optimized function to prevent zoom on inputs
+        function preventZoom() {
+            document.addEventListener('touchstart', function(e) {
+                if (e.touches.length > 1) {
+                    e.preventDefault();
+                }
+            });
+            
+            let lastTouchEnd = 0;
+            document.addEventListener('touchend', function(e) {
+                const now = (new Date()).getTime();
+                if (now - lastTouchEnd <= 300) {
+                    e.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, false);
+        }
+        
+        // Initialize mobile zoom prevention
+        if ('ontouchstart' in window) {
+            preventZoom();
         }
     </script>
     

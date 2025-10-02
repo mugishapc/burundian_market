@@ -1,8 +1,8 @@
-// Enhanced form validation and image handling
+// Mobile-optimized form validation and image handling
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Script loaded - product images system');
+    console.log('Mobile-optimized script loaded');
 
-    // Basic form validation
+    // Mobile-optimized form validation
     const loginForm = document.querySelector("form[action='{{ url_for('login') }}']");
     
     if (loginForm) {
@@ -12,12 +12,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!identifier || !password) {
                 e.preventDefault();
-                alert('Please fill in all fields');
+                showMobileAlert('Please fill in all fields');
             }
         });
     }
     
-    // Register form validation
+    // Mobile-optimized register form validation
     const registerForm = document.querySelector("form[action='{{ url_for('register') }}']");
 
     if (registerForm) {
@@ -27,13 +27,20 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (password && password.length < 6) {
                 e.preventDefault();
-                alert('Password must be at least 6 characters');
+                showMobileAlert('Password must be at least 6 characters');
+                return;
+            }
+            
+            // Mobile-optimized phone validation
+            if (phone && !isValidPhone(phone)) {
+                e.preventDefault();
+                showMobileAlert('Please enter a valid phone number');
                 return;
             }
         });
     }
     
-    // Add product form validation
+    // Mobile-optimized add product form validation
     const addProductForm = document.querySelector("form[action='{{ url_for('add_product') }}']");
 
     if (addProductForm) {
@@ -42,28 +49,28 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (price <= 0) {
                 e.preventDefault();
-                alert('Price must be greater than 0');
+                showMobileAlert('Price must be greater than 0');
             }
         });
     }
     
-    // Enhanced image preview for product upload
+    // Mobile-optimized image preview for product upload
     const imageInput = document.getElementById('image');
     if (imageInput) {
         imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                // Validate file type
+                // Mobile-optimized file validation
                 const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
                 if (!validTypes.includes(file.type)) {
-                    alert('Please select a valid image file (JPEG, PNG, GIF, WEBP)');
+                    showMobileAlert('Please select a valid image file (JPEG, PNG, GIF, WEBP)');
                     this.value = '';
                     return;
                 }
                 
-                // Validate file size (max 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('Image size should be less than 5MB');
+                // Mobile-optimized file size (smaller for mobile)
+                if (file.size > 3 * 1024 * 1024) {
+                    showMobileAlert('Image size should be less than 3MB for mobile');
                     this.value = '';
                     return;
                 }
@@ -72,25 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 reader.onload = function(event) {
                     const preview = document.getElementById('image-preview');
                     if (!preview) {
-                        const previewContainer = document.createElement('div');
-                        previewContainer.className = 'mb-3';
-                        previewContainer.id = 'image-preview-container';
-                        
-                        const previewTitle = document.createElement('p');
-                        previewTitle.className = 'form-label';
-                        previewTitle.textContent = 'Image Preview';
-                        
-                        const previewImg = document.createElement('img');
-                        previewImg.id = 'image-preview';
-                        previewImg.src = event.target.result;
-                        previewImg.className = 'img-thumbnail';
-                        previewImg.style.maxHeight = '200px';
-                        previewImg.style.maxWidth = '100%';
-                        
-                        previewContainer.appendChild(previewTitle);
-                        previewContainer.appendChild(previewImg);
-                        
-                        imageInput.parentNode.insertBefore(previewContainer, imageInput.nextSibling);
+                        createMobileImagePreview(event.target.result);
                     } else {
                         preview.src = event.target.result;
                     }
@@ -100,45 +89,44 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Global image reload function
+    // Mobile-optimized global image reload function
     window.reloadProductImages = function() {
-        console.log('Reloading product images...');
+        console.log('Mobile: Reloading product images...');
         const productImages = document.querySelectorAll('img[src*="data:image"]');
         const timestamp = new Date().getTime();
         
         productImages.forEach(img => {
             if (img.src) {
                 const originalSrc = img.src.split('?')[0];
-                img.src = originalSrc + '?reload=' + timestamp;
+                img.src = originalSrc + '?mobile_reload=' + timestamp;
             }
         });
     };
     
-    // Auto-reload product images every 30 seconds
+    // Mobile-optimized auto-reload (less frequent to save data)
     setInterval(() => {
         if (document.visibilityState === 'visible') {
             window.reloadProductImages();
         }
-    }, 30000);
+    }, 45000); // 45 seconds instead of 30
     
-    // Enhanced error handling for product images
+    // Mobile-optimized error handling for product images
     document.querySelectorAll('img[src*="data:image"]').forEach(img => {
         let retryCount = 0;
-        const maxRetries = 3;
+        const maxRetries = 2; // Less retries on mobile
         
         img.addEventListener('error', function() {
-            console.warn('Product image failed to load:', this.src.substring(0, 100));
+            console.warn('Mobile: Product image failed to load');
             retryCount++;
             
             if (retryCount <= maxRetries) {
-                // Try reloading with exponential backoff
+                // Mobile-optimized backoff
                 setTimeout(() => {
                     const currentSrc = this.src.split('?')[0];
-                    this.src = currentSrc + '?retry=' + retryCount + '&t=' + new Date().getTime();
-                }, 1000 * retryCount);
+                    this.src = currentSrc + '?mobile_retry=' + retryCount + '&t=' + new Date().getTime();
+                }, 1500 * retryCount);
             } else {
-                console.error('Product image failed after', maxRetries, 'attempts');
-                // Hide image and show fallback
+                console.error('Mobile: Product image failed after', maxRetries, 'attempts');
                 this.style.display = 'none';
                 const fallback = this.nextElementSibling;
                 if (fallback && (fallback.classList.contains('no-image') || fallback.classList.contains('image-fallback'))) {
@@ -148,9 +136,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         img.addEventListener('load', function() {
-            console.log('Product image loaded successfully');
+            console.log('Mobile: Product image loaded successfully');
             retryCount = 0;
-            // Hide fallback if image loads successfully
             const fallback = this.nextElementSibling;
             if (fallback && (fallback.classList.contains('no-image') || fallback.classList.contains('image-fallback'))) {
                 fallback.style.display = 'none';
@@ -158,8 +145,130 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Initial product image load assurance
+    // Mobile-optimized initial image load
     setTimeout(() => {
         window.reloadProductImages();
-    }, 1000);
+    }, 1500);
+    
+    // Mobile-specific touch improvements
+    initializeMobileTouch();
+});
+
+// Mobile-optimized helper functions
+function showMobileAlert(message) {
+    // Use native alert for mobile or create a mobile-friendly one
+    if ('ontouchstart' in window) {
+        alert(message);
+    } else {
+        // Create a mobile-friendly alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-warning alert-dismissible fade show position-fixed';
+        alertDiv.style.cssText = 'top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; max-width: 90%;';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 3000);
+    }
+}
+
+function isValidPhone(phone) {
+    // Basic phone validation for mobile
+    const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/;
+    return phoneRegex.test(phone);
+}
+
+function createMobileImagePreview(imageData) {
+    const previewContainer = document.createElement('div');
+    previewContainer.className = 'mb-3';
+    previewContainer.id = 'image-preview-container';
+    
+    const previewTitle = document.createElement('p');
+    previewTitle.className = 'form-label small';
+    previewTitle.textContent = 'Image Preview';
+    
+    const previewImg = document.createElement('img');
+    previewImg.id = 'image-preview';
+    previewImg.src = imageData;
+    previewImg.className = 'img-thumbnail';
+    previewImg.style.maxHeight = '150px'; // Smaller for mobile
+    previewImg.style.maxWidth = '100%';
+    previewImg.style.display = 'block';
+    previewImg.style.margin = '0 auto';
+    
+    previewContainer.appendChild(previewTitle);
+    previewContainer.appendChild(previewImg);
+    
+    const imageInput = document.getElementById('image');
+    imageInput.parentNode.insertBefore(previewContainer, imageInput.nextSibling);
+}
+
+function initializeMobileTouch() {
+    // Improve touch experience
+    document.querySelectorAll('a, button').forEach(element => {
+        element.style.webkitTapHighlightColor = 'transparent';
+    });
+    
+    // Prevent double-tap zoom
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+        }
+        lastTouchEnd = now;
+    }, false);
+    
+    // Better scrolling on mobile
+    document.documentElement.style.scrollBehavior = 'smooth';
+}
+
+// Mobile-optimized image lazy loading
+if ('IntersectionObserver' in window) {
+    const imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                img.src = img.dataset.src;
+                img.classList.remove('lazy');
+                imageObserver.unobserve(img);
+            }
+        });
+    });
+
+    document.querySelectorAll('img.lazy').forEach(img => {
+        imageObserver.observe(img);
+    });
+}
+
+// Mobile network status detection
+window.addEventListener('online', function() {
+    showMobileAlert('Connection restored');
+    window.reloadProductImages();
+});
+
+window.addEventListener('offline', function() {
+    showMobileAlert('You are currently offline');
+});
+
+// Mobile-optimized resize handler
+let resizeTimeout;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(function() {
+        // Adjust layout for mobile orientation changes
+        if (window.innerHeight > window.innerWidth) {
+            // Portrait mode
+            document.body.classList.add('portrait');
+            document.body.classList.remove('landscape');
+        } else {
+            // Landscape mode
+            document.body.classList.add('landscape');
+            document.body.classList.remove('portrait');
+        }
+    }, 250);
 });

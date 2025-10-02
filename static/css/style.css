@@ -1,18 +1,29 @@
-/* General Styles */
+/* Mobile-First Responsive Styles */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f8f9fa;
+    font-size: 14px;
+    line-height: 1.4;
 }
 
+/* Mobile-optimized containers */
+.container {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+/* Hero section mobile optimization */
 .hero-section {
     background: linear-gradient(135deg, #0d6efd, #0b5ed7);
     border-radius: 0 0 10px 10px;
 }
 
+/* Mobile-optimized product images */
 .product-image {
-    height: 200px;
+    height: 150px;
     object-fit: cover;
     transition: opacity 0.3s ease;
+    width: 100%;
 }
 
 .product-image.image-loading {
@@ -31,36 +42,106 @@ body {
     100% { background-position: -200% 0; }
 }
 
-/* Card hover effect */
+/* Mobile-optimized cards */
 .card {
     transition: transform 0.3s, box-shadow 0.3s;
+    margin-bottom: 15px;
+    border: 1px solid #dee2e6;
 }
 
 .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
-/* Image placeholder styles */
+/* Mobile image placeholder */
 .image-placeholder {
     background: linear-gradient(45deg, #f8f9fa, #e9ecef);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #6c757d;
-    font-size: 14px;
-    height: 200px;
+    font-size: 12px;
+    height: 150px;
     border: 1px solid #dee2e6;
 }
 
-/* Responsive adjustments */
+/* Mobile-first responsive adjustments */
 @media (max-width: 768px) {
     .product-image {
-        height: 150px;
+        height: 120px;
     }
     
     .image-placeholder {
-        height: 150px;
+        height: 120px;
+    }
+    
+    .card-body {
+        padding: 12px;
+    }
+    
+    .card-title {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+    
+    .btn {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 576px) {
+    body {
+        font-size: 13px;
+    }
+    
+    .product-image {
+        height: 100px;
+    }
+    
+    .image-placeholder {
+        height: 100px;
+        font-size: 11px;
+    }
+    
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    /* Better grid for mobile */
+    .row {
+        margin-left: -5px;
+        margin-right: -5px;
+    }
+    
+    .col-6, .col-md-3, .col-md-4, .col-md-6 {
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+}
+
+/* Tablet optimization */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .product-image {
+        height: 180px;
+    }
+    
+    .image-placeholder {
+        height: 180px;
+    }
+}
+
+/* Large devices */
+@media (min-width: 1025px) {
+    .product-image {
+        height: 200px;
+    }
+    
+    .image-placeholder {
+        height: 200px;
     }
 }
 
@@ -68,4 +149,72 @@ body {
 .badge.bg-warning {
     font-size: 0.7em;
     padding: 0.2em 0.4em;
+}
+
+/* Mobile-optimized navigation improvements */
+.navbar-nav .nav-link {
+    padding: 8px 12px;
+}
+
+/* Better touch targets for mobile */
+.btn, .nav-link, .dropdown-item {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+/* Mobile form optimization */
+.form-control {
+    font-size: 16px; /* Prevents zoom on iOS */
+}
+
+/* Mobile footer optimization */
+footer {
+    font-size: 0.8rem;
+}
+
+footer h5 {
+    font-size: 0.9rem;
+}
+
+/* Prevent horizontal scroll on mobile */
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* Mobile-optimized spacing */
+.mobile-mb-2 {
+    margin-bottom: 0.5rem !important;
+}
+
+.mobile-p-3 {
+    padding: 1rem !important;
+}
+
+/* Loading animation for better mobile UX */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Mobile-optimized modal */
+.modal-dialog {
+    margin: 10px;
+}
+
+@media (max-width: 576px) {
+    .modal-dialog {
+        margin: 5px;
+    }
 }

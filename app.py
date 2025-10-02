@@ -60,6 +60,12 @@ app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
 app.config['REMEMBER_COOKIE_SECURE'] = True
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+# Add this to your existing configuration
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+
+
 
 # Initialize extensions (NO MIGRATE!)
 db = SQLAlchemy(app)
@@ -1839,6 +1845,33 @@ def timesince(dt, default="just now"):
             return "%d %s ago" % (period, singular if period == 1 else plural)
     
     return default
+
+
+# ADD THESE ROUTES TO YOUR EXISTING app.py
+
+@app.route('/propellerads-verification.txt')
+def propeller_verification():
+    """PropellerAds domain verification file"""
+    verification_content = """PropellerAds Verification
+This file verifies that eechicha.com is owned by the user.
+Verification code: eechicha.com
+Date: 2025"""
+    
+    return verification_content, 200, {'Content-Type': 'text/plain'}
+
+@app.route('/sw.js')
+def service_worker():
+    """Serve PropellerAds service worker"""
+    sw_content = """// PropellerAds Service Worker
+self.options = {
+    "domain": "eechicha.com",
+    "zoneId": 9963851
+};
+self.lary = "";
+importScripts('https://eechicha.com/act/files/service-worker.min.js?r=sw');"""
+    
+    return sw_content, 200, {'Content-Type': 'application/javascript'}
+
 
 
 if __name__ == '__main__':

@@ -2,28 +2,29 @@
 {% block title %}Buyer Dashboard{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="fas fa-shopping-basket me-2"></i>Buyer Dashboard</h2>
+<div class="d-flex justify-content-between align-items-center mb-3 mb-md-4">
+    <h2 class="h4 h2-md"><i class="fas fa-shopping-basket me-2"></i>Buyer Dashboard</h2>
     <div>
-        <a href="{{ url_for('product_search') }}" class="btn btn-primary">
-            <i class="fas fa-search me-1"></i>Browse All Products
+        <a href="{{ url_for('product_search') }}" class="btn btn-primary btn-sm btn-md">
+            <i class="fas fa-search me-1"></i>Browse All
         </a>
     </div>
 </div>
 
-<!-- Categories Section -->
+<!-- Categories Section - Mobile Optimized -->
 {% if categories %}
-<div class="card mb-4">
-    <div class="card-header bg-primary text-white">
-        <h5 class="card-title mb-0"><i class="fas fa-tags me-2"></i>Shop by Category</h5>
+<div class="card mb-3 mb-md-4">
+    <div class="card-header bg-primary text-white py-2">
+        <h5 class="card-title mb-0 h6"><i class="fas fa-tags me-2"></i>Shop by Category</h5>
     </div>
-    <div class="card-body">
-        <div class="row">
+    <div class="card-body p-2 p-md-3">
+        <div class="row g-1 g-md-2">
             {% for category in categories %}
-            <div class="col-md-3 mb-2">
+            <div class="col-6 col-sm-4 col-md-3 mb-1">
                 <a href="{{ url_for('product_search') }}?category={{ category }}" 
-                   class="btn btn-outline-primary w-100 text-start">
-                    <i class="fas fa-folder me-2"></i>{{ category }}
+                   class="btn btn-outline-primary w-100 text-start py-2 small">
+                    <i class="fas fa-folder me-1 me-md-2"></i>
+                    <span class="category-text">{{ category|truncate(15) }}</span>
                 </a>
             </div>
             {% endfor %}
@@ -34,15 +35,15 @@
 
 <!-- All Products Section -->
 <div class="card">
-    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0"><i class="fas fa-boxes me-2"></i>All Products</h5>
-        <span class="badge bg-light text-success">{{ products|length }} products available</span>
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
+        <h5 class="card-title mb-0 h6"><i class="fas fa-boxes me-2"></i>All Products</h5>
+        <span class="badge bg-light text-success">{{ products|length }} available</span>
     </div>
-    <div class="card-body">
+    <div class="card-body p-2 p-md-3">
         {% if products %}
-        <div class="row">
+        <div class="row g-2 g-md-3">
             {% for product in products %}
-            <div class="col-md-3 mb-4">
+            <div class="col-6 col-sm-4 col-md-3 mb-2 mb-md-3">
                 <div class="card h-100 product-card">
                     <!-- Product Image -->
                     <div class="product-image-container position-relative">
@@ -50,74 +51,79 @@
                         <img src="{{ url_for('get_product_image', product_id=product.id) }}" 
                              class="card-img-top product-image" 
                              alt="{{ product.title }}"
-                             style="height: 200px; object-fit: cover;"
                              loading="lazy"
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                         {% endif %}
                         <div class="no-image-placeholder" 
-                             style="height: 200px; {% if product.image_data %}display: none;{% else %}display: flex;{% endif %}">
+                             style="{% if product.image_data %}display: none;{% else %}display: flex;{% endif %}">
                             <div class="text-center w-100">
-                                <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                                <i class="fas fa-camera text-muted mb-1 fa-lg"></i>
                                 <p class="text-muted mb-0 small">No Image</p>
                             </div>
                         </div>
                         
                         <!-- Category Badge -->
                         {% if product.category %}
-                        <div class="position-absolute top-0 start-0 m-2">
-                            <span class="badge bg-primary">{{ product.category }}</span>
+                        <div class="position-absolute top-0 start-0 m-1">
+                            <span class="badge bg-primary small">{{ product.category|truncate(10) }}</span>
                         </div>
                         {% endif %}
                         
                         <!-- Seller Status Badge -->
-                        <div class="position-absolute top-0 end-0 m-2">
+                        <div class="position-absolute top-0 end-0 m-1">
                             {% if product.seller.is_verified %}
-                            <span class="badge bg-success" title="Verified Seller">
-                                <i class="fas fa-check-circle me-1"></i>Verified
+                            <span class="badge bg-success small" title="Verified Seller">
+                                <i class="fas fa-check-circle"></i>
+                                <span class="d-none d-sm-inline">Verified</span>
                             </span>
                             {% else %}
-                            <span class="badge bg-warning text-dark" title="Unverified Seller">
-                                <i class="fas fa-clock me-1"></i>Pending
+                            <span class="badge bg-warning text-dark small" title="Unverified Seller">
+                                <i class="fas fa-clock"></i>
+                                <span class="d-none d-sm-inline">Pending</span>
                             </span>
                             {% endif %}
                         </div>
                     </div>
 
-                    <div class="card-body d-flex flex-column">
-                        <h5 class="card-title product-title">
+                    <div class="card-body d-flex flex-column p-2">
+                        <h6 class="card-title product-title mb-1">
                             <a href="{{ url_for('product_detail', product_id=product.id) }}" 
-                               class="text-decoration-none text-dark">
-                                {{ product.title }}
+                               class="text-decoration-none text-dark small fw-bold">
+                                {{ product.title|truncate(40) }}
                             </a>
-                        </h5>
+                        </h6>
                         
                         {% if product.description %}
-                        <p class="card-text text-muted small flex-grow-1">
-                            {{ product.description[:80] }}{% if product.description|length > 80 %}...{% endif %}
+                        <p class="card-text text-muted small flex-grow-1 mb-1">
+                            {{ product.description[:60] }}{% if product.description|length > 60 %}...{% endif %}
                         </p>
                         {% endif %}
                         
                         <div class="mt-auto">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="text-success mb-0">{{ product.price|format_currency }} BIF</h5>
-                                <small class="text-muted">
-                                    <i class="fas fa-store me-1"></i>{{ product.seller.username }}
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <h6 class="text-success mb-0 small fw-bold">{{ product.price|format_currency }} BIF</h6>
+                                <small class="text-muted d-none d-sm-inline">
+                                    <i class="fas fa-store"></i>
+                                    <span class="d-none d-md-inline">{{ product.seller.username|truncate(8) }}</span>
                                 </small>
                             </div>
                             
-                            <div class="d-grid gap-2">
+                            <div class="d-grid gap-1">
                                 <a href="{{ url_for('product_detail', product_id=product.id) }}" 
-                                   class="btn btn-primary">
-                                    <i class="fas fa-eye me-1"></i>View Details
+                                   class="btn btn-primary btn-sm py-1">
+                                    <i class="fas fa-eye me-1"></i>
+                                    <span class="d-none d-sm-inline">View</span>
                                 </a>
                                 {% if product.seller.phone %}
                                 <a href="https://wa.me/{{ product.seller.phone }}?text=Hi! I'm interested in your product: {{ product.title }}" 
-                                   class="btn btn-success" target="_blank">
-                                    <i class="fab fa-whatsapp me-1"></i>Contact Seller
+                                   class="btn btn-success btn-sm py-1" target="_blank">
+                                    <i class="fab fa-whatsapp me-1"></i>
+                                    <span class="d-none d-sm-inline">Contact</span>
                                 </a>
                                 {% else %}
-                                <button class="btn btn-secondary" disabled>
-                                    <i class="fas fa-phone me-1"></i>No Contact
+                                <button class="btn btn-secondary btn-sm py-1" disabled>
+                                    <i class="fas fa-phone me-1"></i>
+                                    <span class="d-none d-sm-inline">No Contact</span>
                                 </button>
                                 {% endif %}
                             </div>
@@ -129,12 +135,12 @@
         </div>
         {% else %}
         <!-- No Products Available -->
-        <div class="text-center py-5">
-            <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
-            <h4 class="text-muted">No Products Available</h4>
-            <p class="text-muted mb-4">There are no products listed yet. Check back later!</p>
+        <div class="text-center py-4 py-md-5">
+            <i class="fas fa-box-open text-muted mb-3 fa-2x"></i>
+            <h5 class="text-muted h6">No Products Available</h5>
+            <p class="text-muted mb-3 small">There are no products listed yet. Check back later!</p>
             {% if session.user_type == 'seller' %}
-            <a href="{{ url_for('add_product') }}" class="btn btn-success">
+            <a href="{{ url_for('add_product') }}" class="btn btn-success btn-sm">
                 <i class="fas fa-plus me-2"></i>Add Your First Product
             </a>
             {% endif %}
@@ -147,21 +153,26 @@
 .product-card {
     transition: all 0.3s ease;
     border: 1px solid #e9ecef;
+    margin-bottom: 0;
 }
 
 .product-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     border-color: #007bff;
 }
 
 .product-image-container {
     overflow: hidden;
     background-color: #f8f9fa;
+    height: 120px;
 }
 
 .product-image {
     transition: transform 0.3s ease;
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
 }
 
 .product-card:hover .product-image {
@@ -173,11 +184,11 @@
     align-items: center;
     justify-content: center;
     border-bottom: 1px solid #e9ecef;
+    height: 120px;
 }
 
 .product-title {
-    font-size: 1.1rem;
-    line-height: 1.4;
+    line-height: 1.3;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -185,56 +196,141 @@
 }
 
 .card-text {
-    font-size: 0.9rem;
-    line-height: 1.4;
+    line-height: 1.3;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .col-md-3 {
-        flex: 0 0 50%;
-        max-width: 50%;
+/* Mobile-first responsive adjustments */
+@media (max-width: 576px) {
+    .col-6 {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    
+    .product-image-container {
+        height: 100px;
+    }
+    
+    .no-image-placeholder {
+        height: 100px;
+    }
+    
+    .category-text {
+        font-size: 0.8rem;
+    }
+    
+    .btn-md {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
     }
 }
 
+/* Tablet optimization */
+@media (min-width: 577px) and (max-width: 768px) {
+    .product-image-container {
+        height: 140px;
+    }
+    
+    .no-image-placeholder {
+        height: 140px;
+    }
+}
+
+/* Desktop optimization */
+@media (min-width: 769px) {
+    .product-image-container {
+        height: 160px;
+    }
+    
+    .no-image-placeholder {
+        height: 160px;
+    }
+}
+
+/* Better touch targets */
+.btn, .nav-link {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-sm {
+    min-height: 36px;
+}
+
+/* Loading animation for cards */
+.product-card {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 0.5s ease forwards;
+}
+
+@keyframes fadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Stagger animation for multiple cards */
+.product-card:nth-child(1) { animation-delay: 0.1s; }
+.product-card:nth-child(2) { animation-delay: 0.2s; }
+.product-card:nth-child(3) { animation-delay: 0.3s; }
+.product-card:nth-child(4) { animation-delay: 0.4s; }
+.product-card:nth-child(5) { animation-delay: 0.5s; }
+.product-card:nth-child(6) { animation-delay: 0.6s; }
+
+/* Improved badge visibility */
+.badge {
+    font-size: 0.7rem;
+    padding: 0.3em 0.6em;
+}
+
+/* Better card spacing on mobile */
 @media (max-width: 576px) {
-    .col-md-3 {
-        flex: 0 0 100%;
-        max-width: 100%;
+    .row.g-2 {
+        margin-left: -2px;
+        margin-right: -2px;
+    }
+    
+    .col-6 {
+        padding-left: 2px;
+        padding-right: 2px;
     }
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Buyer dashboard loaded - checking images');
+    console.log('Mobile-optimized buyer dashboard loaded');
     
     const productImages = document.querySelectorAll('.product-image');
     console.log(`Found ${productImages.length} product images on buyer dashboard`);
     
+    // Mobile-optimized image handling
     productImages.forEach((img, index) => {
         const productName = img.alt || `Product ${index + 1}`;
         
         // Check if image is already loaded
         if (img.complete) {
             if (img.naturalHeight === 0) {
-                console.log(`❌ Buyer dashboard image failed: "${productName}"`);
+                console.log(`❌ Mobile: Image failed: "${productName}"`);
                 img.style.display = 'none';
                 const placeholder = img.nextElementSibling;
                 if (placeholder && placeholder.classList.contains('no-image-placeholder')) {
                     placeholder.style.display = 'flex';
                 }
             } else {
-                console.log(`✅ Buyer dashboard image loaded: "${productName}"`);
+                console.log(`✅ Mobile: Image loaded: "${productName}"`);
             }
         } else {
             // Image is still loading
             img.addEventListener('load', function() {
-                console.log(`✅ Buyer dashboard image loaded: "${productName}"`);
+                console.log(`✅ Mobile: Image loaded: "${productName}"`);
             });
             
             img.addEventListener('error', function() {
-                console.log(`❌ Buyer dashboard image failed: "${productName}"`);
+                console.log(`❌ Mobile: Image failed: "${productName}"`);
                 this.style.display = 'none';
                 const placeholder = this.nextElementSibling;
                 if (placeholder && placeholder.classList.contains('no-image-placeholder')) {
@@ -244,23 +340,77 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Add loading animation
-    const productCards = document.querySelectorAll('.product-card');
-    productCards.forEach(card => {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
+    // Mobile touch improvements
+    document.querySelectorAll('.product-card').forEach(card => {
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', function(e) {
+            // Don't trigger if user clicked on a button or link
+            if (!e.target.closest('a') && !e.target.closest('button')) {
+                const link = this.querySelector('a.btn');
+                if (link) {
+                    link.click();
+                }
+            }
+        });
     });
     
-    // Animate cards in
-    setTimeout(() => {
-        productCards.forEach((card, index) => {
-            setTimeout(() => {
-                card.style.transition = 'all 0.5s ease';
-                card.style.opacity = '1';
-                card.style.transform = 'translateY(0)';
-            }, index * 100);
+    // Mobile-optimized image lazy loading
+    if ('IntersectionObserver' in window) {
+        const imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                    }
+                    imageObserver.unobserve(img);
+                }
+            });
         });
-    }, 100);
+
+        document.querySelectorAll('.product-image').forEach(img => {
+            // Store original src in data-src for lazy loading
+            if (!img.dataset.src) {
+                img.dataset.src = img.src;
+                img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E";
+                imageObserver.observe(img);
+            }
+        });
+    }
+    
+    // Mobile category button improvements
+    document.querySelectorAll('.category-text').forEach(text => {
+        const originalText = text.textContent;
+        if (originalText.length > 12) {
+            text.textContent = originalText.substring(0, 10) + '...';
+        }
+    });
+    
+    // Mobile swipe support for product cards
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    document.querySelectorAll('.product-card').forEach(card => {
+        card.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        card.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe(card);
+        });
+    });
+    
+    function handleSwipe(card) {
+        const swipeDistance = touchEndX - touchStartX;
+        if (Math.abs(swipeDistance) > 50) { // Minimum swipe distance
+            if (swipeDistance > 0) {
+                // Right swipe - show details
+                const link = card.querySelector('a[href*="product_detail"]');
+                if (link) link.click();
+            }
+        }
+    }
 });
 </script>
 {% endblock %}
